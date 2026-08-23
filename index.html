@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Forgehold</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Spectral:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14110f;
+    --surface:#1f1a15;
+    --surface2:#2a2219;
+    --line:#3a2f22;
+    --parchment:#e8dcc4;
+    --parchment-dim:#a89a80;
+    --bronze:#b8863b;
+    --bronze-bright:#e0aa55;
+    --violet:#8a6bc4;
+    --violet-bright:#a98bde;
+    --wood:#8fae5c;
+    --stone:#9aa0a8;
+    --food:#d4a24c;
+    --gold:#e0c15a;
+    --essence:#a98bde;
+    --magic:#5b8dd6;
+    --rare:#d6b85b;
+    --exalted:#b98be0;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--ink);color:var(--parchment);font-family:'Spectral',serif;}
+  body{min-height:100vh;padding-bottom:40px;}
+  h1,h2,h3{font-family:'Cinzel',serif;letter-spacing:0.03em;margin:0;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  ::selection{background:var(--bronze);color:#14110f;}
+
+  /* ---------- header / resource bar ---------- */
+  header{
+    background:linear-gradient(180deg,#1c1712,#14110f 90%);
+    border-bottom:2px solid var(--line);
+    padding:14px 16px 10px;
+    position:sticky; top:0; z-index:20;
+  }
+  .title-row{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;}
+  .title-row h1{font-size:1.35rem;color:var(--bronze-bright);}
+  .title-row .subtitle{font-size:0.68rem;color:var(--parchment-dim);letter-spacing:0.15em;text-transform:uppercase;}
+  .header-actions{display:flex;gap:6px;}
+  .icon-btn{
+    background:var(--surface2);border:1px solid var(--bronze);color:var(--bronze-bright);
+    border-radius:7px;padding:6px 10px;font-size:0.68rem;font-family:'Cinzel',serif;
+    font-weight:700;cursor:pointer;white-space:nowrap;
+  }
+  .icon-btn:active{background:var(--bronze);color:#1a1208;}
+  .resbar{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
+  .res{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:6px 4px;
+    text-align:center;
+  }
+  .res .amt{font-size:0.85rem;font-weight:600;}
+  .res .rate{font-size:0.6rem;color:var(--parchment-dim);}
+  .res.wood .amt{color:var(--wood);}
+  .res.stone .amt{color:var(--stone);}
+  .res.food .amt{color:var(--food);}
+  .res.gold .amt{color:var(--gold);}
+  .res.essence .amt{color:var(--essence);}
+
+  /* ---------- tabs ---------- */
+  nav.tabs{
+    display:flex; gap:2px; padding:10px 16px 0;
+    border-bottom:2px solid var(--line);
+    background:var(--ink);
+    position:sticky; top:76px; z-index:19;
+  }
+  nav.tabs button{
+    flex:1; background:none; border:none; color:var(--parchment-dim);
+    font-family:'Cinzel',serif; font-size:0.72rem; letter-spacing:0.08em;
+    text-transform:uppercase; padding:10px 4px 12px; cursor:pointer;
+    border-bottom:3px solid transparent;
+  }
+  nav.tabs button.active{color:var(--bronze-bright); border-bottom-color:var(--bronze);}
+
+  main{padding:16px;max-width:720px;margin:0 auto;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  /* ---------- building cards ---------- */
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:12px 14px;
+    margin-bottom:10px;
+  }
+  .b-row{display:flex;align-items:center;gap:12px;}
+  .b-icon{font-size:1.6rem;width:38px;text-align:center;flex-shrink:0;}
+  .b-info{flex:1;min-width:0;}
+  .b-info .name{font-family:'Cinzel',serif;font-size:0.95rem;color:var(--parchment);}
+  .b-info .lvl{font-size:0.7rem;color:var(--parchment-dim);}
+  .b-info .prod{font-size:0.72rem;color:var(--bronze-bright);margin-top:2px;}
+  .upbtn{
+    background:linear-gradient(180deg,var(--bronze-bright),var(--bronze));
+    color:#1a1208;border:none;border-radius:7px;
+    padding:9px 12px;font-family:'Cinzel',serif;font-size:0.68rem;font-weight:700;
+    letter-spacing:0.03em;cursor:pointer;text-align:center;min-width:96px;
+  }
+  .upbtn:disabled{background:#3a3226;color:#6b6152;cursor:not-allowed;}
+  .upbtn .cost{display:block;font-family:'JetBrains Mono',monospace;font-weight:400;font-size:0.62rem;margin-top:2px;}
+
+  /* ---------- forge / crafting ---------- */
+  .craft-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+  .craft-btn{
+    background:var(--surface2);border:1px solid var(--line);border-radius:9px;
+    padding:12px 8px;text-align:center;cursor:pointer;color:var(--parchment);
+  }
+  .craft-btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .craft-btn .ic{font-size:1.5rem;}
+  .craft-btn .nm{font-family:'Cinzel',serif;font-size:0.78rem;margin-top:4px;}
+  .craft-btn .cst{font-size:0.62rem;color:var(--parchment-dim);margin-top:3px;font-family:'JetBrains Mono',monospace;}
+
+  h2.section-title{font-size:0.85rem;color:var(--bronze-bright);text-transform:uppercase;letter-spacing:0.1em;margin:18px 0 10px;border-bottom:1px solid var(--line);padding-bottom:6px;}
+
+  .item-card{
+    border-radius:10px; padding:12px 14px; margin-bottom:10px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-left:4px solid var(--parchment-dim);
+  }
+  .item-card.rarity-Crude{border-left-color:#8a8070;}
+  .item-card.rarity-Tempered{border-left-color:var(--magic);}
+  .item-card.rarity-Masterwork{border-left-color:var(--rare);}
+  .item-card.rarity-Exalted{border-left-color:var(--exalted); box-shadow:0 0 14px -6px var(--exalted);}
+  .item-head{display:flex;justify-content:space-between;align-items:baseline;}
+  .item-head .iname{font-family:'Cinzel',serif;font-size:0.92rem;}
+  .item-head .irarity{font-size:0.62rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--parchment-dim);}
+  .affix-list{list-style:none;margin:8px 0;padding:0;font-size:0.78rem;}
+  .affix-list li{color:var(--bronze-bright);padding:2px 0;}
+  .affix-list li.empty{color:var(--parchment-dim);font-style:italic;}
+  .item-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .orb-btn{
+    background:var(--surface2);border:1px solid var(--violet);color:var(--violet-bright);
+    border-radius:6px;padding:6px 9px;font-size:0.68rem;font-family:'JetBrains Mono',monospace;cursor:pointer;
+  }
+  .orb-btn:disabled{opacity:0.35;cursor:not-allowed;border-color:var(--line);color:var(--parchment-dim);}
+  .equip-btn{
+    background:linear-gradient(180deg,var(--bronze-bright),var(--bronze));
+    color:#1a1208;border:none;border-radius:6px;padding:6px 10px;
+    font-size:0.68rem;font-family:'Cinzel',serif;font-weight:700;cursor:pointer;
+  }
+
+  /* ---------- equipment ---------- */
+  .slot{
+    background:var(--surface);border:1px dashed var(--line);border-radius:10px;
+    padding:14px;margin-bottom:10px;
+  }
+  .slot .slot-name{font-size:0.65rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--parchment-dim);margin-bottom:6px;}
+  .slot .empty-slot{color:var(--parchment-dim);font-style:italic;font-size:0.82rem;}
+  .unequip-btn{
+    background:none;border:1px solid var(--line);color:var(--parchment-dim);
+    border-radius:6px;padding:5px 9px;font-size:0.65rem;cursor:pointer;margin-top:8px;
+  }
+  .totals{
+    background:var(--surface2);border:1px solid var(--bronze);border-radius:10px;
+    padding:12px 14px;margin-bottom:16px;font-size:0.8rem;
+  }
+  .totals .t-row{display:flex;justify-content:space-between;padding:3px 0;color:var(--bronze-bright);}
+
+  .empty-msg{color:var(--parchment-dim);font-style:italic;text-align:center;padding:24px 0;font-size:0.85rem;}
+
+  /* toast */
+  #toast{
+    position:fixed; bottom:16px; left:50%; transform:translateX(-50%) translateY(140%);
+    background:var(--surface2); border:1px solid var(--bronze); color:var(--parchment);
+    padding:12px 18px; border-radius:10px; font-size:0.8rem; max-width:90%;
+    transition:transform 0.4s ease; z-index:50; box-shadow:0 6px 24px rgba(0,0,0,0.5);
+  }
+  #toast.show{transform:translateX(-50%) translateY(0);}
+
+  .reset-row{text-align:center;margin-top:24px;}
+  .reset-row button{
+    background:none;border:1px solid #6b3a3a;color:#c98a8a;border-radius:6px;
+    padding:8px 14px;font-size:0.7rem;cursor:pointer;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-row">
+    <h1>⚒ Forgehold</h1>
+    <div class="header-actions">
+      <button id="header-save-btn" class="icon-btn" title="Save game">💾 Save</button>
+      <button id="header-load-btn" class="icon-btn" title="Load game">📂 Load</button>
+    </div>
+  </div>
+  <div class="subtitle" style="margin:-6px 0 8px;">a settlement &amp; forge</div>
+  <div class="resbar">
+    <div class="res wood"><div class="amt mono" id="r-wood">0</div><div class="rate mono" id="rt-wood">+0/s</div></div>
+    <div class="res stone"><div class="amt mono" id="r-stone">0</div><div class="rate mono" id="rt-stone">+0/s</div></div>
+    <div class="res food"><div class="amt mono" id="r-food">0</div><div class="rate mono" id="rt-food">+0/s</div></div>
+    <div class="res gold"><div class="amt mono" id="r-gold">0</div><div class="rate mono" id="rt-gold">+0/s</div></div>
+    <div class="res essence"><div class="amt mono" id="r-essence">0</div><div class="rate mono" id="rt-essence">+0/s</div></div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="settlement">Settlement</button>
+  <button class="tab-btn" data-tab="forge">Forge</button>
+  <button class="tab-btn" data-tab="equipment">Equipment</button>
+</nav>
+
+<main>
+  <div class="panel active" id="panel-settlement">
+    <div id="buildings-list"></div>
+  </div>
+
+  <div class="panel" id="panel-forge">
+    <h2 class="section-title">Craft a base item</h2>
+    <div class="craft-grid" id="craft-grid"></div>
+    <h2 class="section-title">Unequipped items</h2>
+    <div id="inventory-list"></div>
+  </div>
+
+  <div class="panel" id="panel-equipment">
+    <div class="totals" id="equip-totals"></div>
+    <div id="equip-slots"></div>
+  </div>
+
+  <h2 class="section-title">Save / Load</h2>
+  <div class="card">
+    <p style="font-size:0.78rem;color:var(--parchment-dim);margin:0 0 6px;">
+      Use the <strong>💾 Save</strong> and <strong>📂 Load</strong> buttons at the top of the screen.
+    </p>
+    <p id="storage-mode-line" style="font-size:0.72rem;color:var(--bronze-bright);margin:0 0 10px;"></p>
+    <div id="fallback-save-area" style="display:none;">
+      <p style="font-size:0.72rem;color:var(--parchment-dim);margin:10px 0 6px;">Backup save code (copied to your clipboard if possible):</p>
+      <textarea id="save-code-box" class="mono" readonly style="width:100%;height:70px;background:var(--surface2);color:var(--parchment);border:1px solid var(--line);border-radius:6px;padding:8px;font-size:0.68rem;margin-bottom:10px;"></textarea>
+    </div>
+    <div id="fallback-load-area" style="display:none;">
+      <p style="font-size:0.72rem;color:var(--parchment-dim);margin:10px 0 6px;">No stored save found here. Paste a backup code to restore it:</p>
+      <textarea id="load-code-box" class="mono" placeholder="Paste a save code here…" style="width:100%;height:70px;background:var(--surface2);color:var(--parchment);border:1px solid var(--line);border-radius:6px;padding:8px;font-size:0.68rem;margin-bottom:8px;"></textarea>
+      <button class="upbtn" id="load-save-btn" style="width:100%;">Load pasted code</button>
+    </div>
+  </div>
+
+  <div class="reset-row"><button id="reset-btn">Reset progress</button></div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+
+// ---------------------------------------------------------------
+// Config
+// ---------------------------------------------------------------
+const RESOURCE_META = {
+  wood:{label:'Wood', icon:'🪵'},
+  stone:{label:'Stone', icon:'🪨'},
+  food:{label:'Food', icon:'🌾'},
+  gold:{label:'Gold', icon:'💰'},
+  essence:{label:'Essence', icon:'✨'},
+};
+
+const BUILDINGS = {
+  sawmill: {name:'Sawmill', icon:'🪓', produces:'wood', base:0.5, costRes:['stone','food'], costBase:[8,6]},
+  quarry:  {name:'Quarry',  icon:'⛏️', produces:'stone', base:0.4, costRes:['wood','food'], costBase:[8,6]},
+  farm:    {name:'Farm',    icon:'🌾', produces:'food', base:0.6, costRes:['wood','stone'], costBase:[8,8]},
+  mine:    {name:'Gold Mine', icon:'💰', produces:'gold', base:0.15, costRes:['wood','stone','food'], costBase:[12,12,10]},
+  well:    {name:'Arcane Well', icon:'✨', produces:'essence', base:0.03, costRes:['gold','food'], costBase:[20,15]},
+};
+const COST_GROWTH = 1.18;
+
+const BASE_ITEMS = {
+  sword:  {name:'Sword',  icon:'🗡️', slot:'weapon', cost:{wood:30, gold:20}},
+  shield: {name:'Shield', icon:'🛡️', slot:'shield', cost:{stone:25, gold:20}},
+  amulet: {name:'Amulet', icon:'📿', slot:'amulet', cost:{wood:15, stone:15, gold:30}},
+  ring:   {name:'Ring',   icon:'💍', slot:'ring', cost:{gold:40}},
+};
+
+const RARITY_BY_COUNT = ['Crude','Tempered','Masterwork','Exalted'];
+const AFFIX_STATS = ['wood','stone','food','gold','essence','all'];
+
+const SAVE_KEY = 'forgehold-save-v1';
+const TICK_MS = 1000;
+const SAVE_EVERY_TICKS = 8;
+const MAX_OFFLINE_SECONDS = 12*3600;
+
+// ---------------------------------------------------------------
+// State
+// ---------------------------------------------------------------
+let state = {
+  resources: {wood:20, stone:20, food:20, gold:15, essence:0},
+  buildings: {sawmill:1, quarry:1, farm:1, mine:0, well:0},
+  items: [], // {id, base, affixes:[{stat,value}], equipped:bool}
+  equipment: {weapon:null, shield:null, amulet:null, ring:null},
+  nextItemId: 1,
+  lastTick: Date.now(),
+};
+
+let tickCount = 0;
+
+// ---------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------
+function fmt(n){
+  if(n < 1000) return n.toFixed(n<10?1:0);
+  if(n < 1e6) return (n/1e3).toFixed(2)+'k';
+  if(n < 1e9) return (n/1e6).toFixed(2)+'M';
+  return (n/1e9).toFixed(2)+'B';
+}
+function costFor(buildingKey, level){
+  const b = BUILDINGS[buildingKey];
+  const obj = {};
+  b.costRes.forEach((res,i)=>{
+    obj[res] = Math.ceil(b.costBase[i]*Math.pow(COST_GROWTH, level));
+  });
+  return obj;
+}
+function canAfford(costObj){
+  return Object.entries(costObj).every(([res,amt])=> state.resources[res] >= amt);
+}
+function pay(costObj){
+  Object.entries(costObj).forEach(([res,amt])=>{ state.resources[res]-=amt; });
+}
+function equipmentBonusFor(stat){
+  // sum of % bonuses across all equipped items matching stat or 'all'
+  let sum = 0;
+  Object.values(state.equipment).forEach(itemId=>{
+    if(!itemId) return;
+    const item = state.items.find(i=>i.id===itemId);
+    if(!item) return;
+    item.affixes.forEach(a=>{
+      if(a.stat === stat || a.stat === 'all') sum += a.value;
+    });
+  });
+  return sum/100;
+}
+const GLOBAL_SPEED = 0.2; // 1/5th pace — slows the whole game 5x
+function productionRate(res){
+  let total = 0;
+  Object.entries(BUILDINGS).forEach(([key,b])=>{
+    if(b.produces === res){
+      total += b.base * state.buildings[key];
+    }
+  });
+  total *= (1 + equipmentBonusFor(res));
+  total *= GLOBAL_SPEED;
+  return total;
+}
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._h);
+  toast._h = setTimeout(()=> t.classList.remove('show'), 3600);
+}
+
+// ---------------------------------------------------------------
+// Storage — detects the environment and picks the best option:
+//   1. window.storage  (running inside a published Claude artifact)
+//   2. localStorage    (downloaded and opened as a standalone file)
+//   3. backup code     (neither available — manual copy/paste)
+// ---------------------------------------------------------------
+const hasCloudStorage = (typeof window.storage !== 'undefined' && !!window.storage);
+let hasLocalStorage = false;
+try{
+  localStorage.setItem('__forgehold_test__', '1');
+  localStorage.removeItem('__forgehold_test__');
+  hasLocalStorage = true;
+}catch(e){
+  hasLocalStorage = false;
+}
+// storageMode: 'cloud' | 'local' | 'none'
+let storageMode = hasCloudStorage ? 'cloud' : (hasLocalStorage ? 'local' : 'none');
+
+function describeStorageMode(){
+  if(storageMode === 'cloud') return 'Saving to your Claude account.';
+  if(storageMode === 'local') return 'Saving to this browser on this device.';
+  return "This environment can't auto-save — use the backup code below.";
+}
+
+async function storageWrite(json){
+  if(storageMode === 'cloud'){
+    await window.storage.set(SAVE_KEY, json, false);
+  } else if(storageMode === 'local'){
+    localStorage.setItem(SAVE_KEY, json);
+  } else {
+    throw new Error('no storage available');
+  }
+}
+async function storageRead(){
+  if(storageMode === 'cloud'){
+    const res = await window.storage.get(SAVE_KEY, false);
+    return res ? res.value : null;
+  } else if(storageMode === 'local'){
+    return localStorage.getItem(SAVE_KEY);
+  }
+  return null;
+}
+
+async function silentAutosave(){
+  if(storageMode === 'none') return;
+  try{
+    state.lastTick = Date.now();
+    await storageWrite(JSON.stringify(state));
+  }catch(e){
+    if(storageMode === 'cloud') storageMode = hasLocalStorage ? 'local' : 'none';
+    else storageMode = 'none';
+  }
+}
+async function bootLoad(){
+  if(storageMode === 'none'){ render(); return; }
+  try{
+    const value = await storageRead();
+    if(value){
+      const loaded = JSON.parse(value);
+      state = Object.assign(state, loaded);
+      applyOfflineProgress();
+    }
+  }catch(e){
+    if(storageMode === 'cloud') storageMode = hasLocalStorage ? 'local' : 'none';
+    else storageMode = 'none';
+  }
+  render();
+}
+
+function encodeSaveCode(){
+  state.lastTick = Date.now();
+  const json = JSON.stringify(state);
+  return btoa(unescape(encodeURIComponent(json)));
+}
+function decodeSaveCode(code){
+  const json = decodeURIComponent(escape(atob(code.trim())));
+  return JSON.parse(json);
+}
+
+async function showFallbackCode(){
+  const code = encodeSaveCode();
+  document.getElementById('fallback-save-area').style.display = 'block';
+  const box = document.getElementById('save-code-box');
+  box.value = code;
+  try{
+    await navigator.clipboard.writeText(code);
+    toast("Couldn't auto-save here — a backup code was copied to your clipboard. Paste it to Claude to keep it safe.");
+  }catch(e){
+    toast("Couldn't auto-save here — a backup code is shown below. Copy it somewhere safe.");
+  }
+}
+
+async function saveGame(){
+  state.lastTick = Date.now();
+  if(storageMode !== 'none'){
+    try{
+      await storageWrite(JSON.stringify(state));
+      toast('Game saved. ' + describeStorageMode());
+      document.getElementById('storage-mode-line').textContent = describeStorageMode();
+      return;
+    }catch(e){
+      if(storageMode === 'cloud') storageMode = hasLocalStorage ? 'local' : 'none';
+      else storageMode = 'none';
+    }
+  }
+  document.getElementById('storage-mode-line').textContent = describeStorageMode();
+  await showFallbackCode();
+}
+
+async function loadGame(){
+  if(storageMode !== 'none'){
+    try{
+      const value = await storageRead();
+      if(value){
+        const loaded = JSON.parse(value);
+        state = Object.assign(state, loaded);
+        toast('Game loaded.');
+        render();
+        return;
+      } else {
+        toast('No saved game found yet — play a bit, then tap Save.');
+        return;
+      }
+    }catch(e){
+      if(storageMode === 'cloud') storageMode = hasLocalStorage ? 'local' : 'none';
+      else storageMode = 'none';
+    }
+  }
+  document.getElementById('fallback-load-area').style.display = 'block';
+  toast("Couldn't auto-load here — paste a backup code below.");
+}
+
+function loadFromPastedCode(){
+  const input = document.getElementById('load-code-box');
+  const code = input.value;
+  if(!code || !code.trim()){ toast('Paste a save code first.'); return; }
+  try{
+    const loaded = decodeSaveCode(code);
+    state = Object.assign(state, loaded);
+    input.value = '';
+    document.getElementById('fallback-load-area').style.display = 'none';
+    toast('Progress restored from backup code.');
+    render();
+  }catch(e){
+    toast("That save code couldn't be read — check you copied the whole thing.");
+  }
+}
+
+document.getElementById('header-save-btn').addEventListener('click', saveGame);
+document.getElementById('header-load-btn').addEventListener('click', loadGame);
+document.getElementById('load-save-btn').addEventListener('click', loadFromPastedCode);
+function applyOfflineProgress(){
+  const now = Date.now();
+  let elapsedSec = (now - (state.lastTick||now))/1000;
+  if(elapsedSec < 2) return;
+  elapsedSec = Math.min(elapsedSec, MAX_OFFLINE_SECONDS);
+  const gains = {};
+  Object.keys(RESOURCE_META).forEach(res=>{
+    const rate = productionRate(res);
+    const gain = rate*elapsedSec;
+    state.resources[res] += gain;
+    if(gain > 0.05) gains[res] = gain;
+  });
+  state.lastTick = now;
+  const parts = Object.entries(gains).map(([res,amt])=> `${RESOURCE_META[res].icon} +${fmt(amt)}`);
+  if(parts.length){
+    const mins = Math.floor(elapsedSec/60);
+    toast(`Welcome back — while you were away (${mins}m): ${parts.join('  ')}`);
+  }
+}
+
+// ---------------------------------------------------------------
+// Game tick
+// ---------------------------------------------------------------
+function tick(){
+  Object.keys(RESOURCE_META).forEach(res=>{
+    state.resources[res] += productionRate(res)/(1000/TICK_MS);
+  });
+  tickCount++;
+  if(tickCount % SAVE_EVERY_TICKS === 0) silentAutosave();
+  renderResourceBar();
+  // lightweight re-render of dynamic cost-dependent buttons
+  renderBuildings();
+  renderCraftGrid();
+  renderInventory();
+}
+
+// ---------------------------------------------------------------
+// Actions
+// ---------------------------------------------------------------
+function upgradeBuilding(key){
+  const cost = costFor(key, state.buildings[key]);
+  if(!canAfford(cost)) return;
+  pay(cost);
+  state.buildings[key]++;
+  silentAutosave();
+  render();
+}
+
+function craftItem(baseKey){
+  const base = BASE_ITEMS[baseKey];
+  if(!canAfford(base.cost)) return;
+  pay(base.cost);
+  const item = {id: state.nextItemId++, base: baseKey, affixes: [], equipped:false};
+  state.items.push(item);
+  toast(`Crafted a ${base.name}.`);
+  silentAutosave();
+  render();
+}
+
+function randomAffix(){
+  const stat = AFFIX_STATS[Math.floor(Math.random()*AFFIX_STATS.length)];
+  const value = stat === 'all'
+    ? +(Math.random()*5+3).toFixed(1)
+    : +(Math.random()*14+4).toFixed(1);
+  return {stat, value};
+}
+
+function enhanceCost(item){ return Math.round(8 + item.affixes.length*12); }
+function alterCost(){ return 10; }
+function chaosCost(item){ return Math.round(15 + item.affixes.length*5); }
+
+function applyEnhance(itemId){
+  const item = state.items.find(i=>i.id===itemId);
+  if(!item || item.affixes.length>=3) return;
+  const cost = enhanceCost(item);
+  if(state.resources.essence < cost) return;
+  state.resources.essence -= cost;
+  item.affixes.push(randomAffix());
+  toast('The orb crackles — a new property emerges.');
+  silentAutosave();
+  render();
+}
+function applyAlter(itemId){
+  const item = state.items.find(i=>i.id===itemId);
+  if(!item || item.affixes.length===0) return;
+  const cost = alterCost();
+  if(state.resources.essence < cost) return;
+  state.resources.essence -= cost;
+  const idx = Math.floor(Math.random()*item.affixes.length);
+  item.affixes[idx] = randomAffix();
+  toast('One property shifts and reforms.');
+  silentAutosave();
+  render();
+}
+function applyChaos(itemId){
+  const item = state.items.find(i=>i.id===itemId);
+  if(!item || item.affixes.length===0) return;
+  const cost = chaosCost(item);
+  if(state.resources.essence < cost) return;
+  state.resources.essence -= cost;
+  const n = item.affixes.length;
+  item.affixes = Array.from({length:n}, randomAffix);
+  toast('Chaos remakes the item entirely.');
+  silentAutosave();
+  render();
+}
+function equipItem(itemId){
+  const item = state.items.find(i=>i.id===itemId);
+  if(!item) return;
+  const slot = BASE_ITEMS[item.base].slot;
+  // unequip whatever is currently there
+  const current = state.equipment[slot];
+  if(current){
+    const cur = state.items.find(i=>i.id===current);
+    if(cur) cur.equipped = false;
+  }
+  state.equipment[slot] = item.id;
+  item.equipped = true;
+  toast(`Equipped ${itemDisplayName(item)}.`);
+  silentAutosave();
+  render();
+}
+function unequipSlot(slot){
+  const itemId = state.equipment[slot];
+  if(!itemId) return;
+  const item = state.items.find(i=>i.id===itemId);
+  if(item) item.equipped = false;
+  state.equipment[slot] = null;
+  silentAutosave();
+  render();
+}
+function itemDisplayName(item){
+  return `${BASE_ITEMS[item.base].name}`;
+}
+
+// ---------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------
+function renderResourceBar(){
+  Object.keys(RESOURCE_META).forEach(res=>{
+    document.getElementById('r-'+res).textContent = fmt(state.resources[res]);
+    document.getElementById('rt-'+res).textContent = '+'+fmt(productionRate(res))+'/s';
+  });
+}
+
+function renderBuildings(){
+  const el = document.getElementById('buildings-list');
+  el.innerHTML = '';
+  Object.entries(BUILDINGS).forEach(([key,b])=>{
+    const level = state.buildings[key];
+    const cost = costFor(key, level);
+    const affordable = canAfford(cost);
+    const costStr = Object.entries(cost).map(([r,a])=> `${RESOURCE_META[r].icon}${fmt(a)}`).join(' ');
+    const rate = (b.base*level).toFixed(2);
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="b-row">
+        <div class="b-icon">${b.icon}</div>
+        <div class="b-info">
+          <div class="name">${b.name}</div>
+          <div class="lvl">Level ${level}</div>
+          <div class="prod">${RESOURCE_META[b.produces].icon} ${rate}/s base</div>
+        </div>
+        <button class="upbtn" ${affordable?'':'disabled'} data-up="${key}">
+          Upgrade
+          <span class="cost">${costStr}</span>
+        </button>
+      </div>`;
+    el.appendChild(card);
+  });
+  el.querySelectorAll('[data-up]').forEach(btn=>{
+    btn.addEventListener('click', ()=> upgradeBuilding(btn.getAttribute('data-up')));
+  });
+}
+
+function renderCraftGrid(){
+  const el = document.getElementById('craft-grid');
+  el.innerHTML = '';
+  Object.entries(BASE_ITEMS).forEach(([key,b])=>{
+    const affordable = canAfford(b.cost);
+    const costStr = Object.entries(b.cost).map(([r,a])=> `${RESOURCE_META[r].icon}${fmt(a)}`).join(' ');
+    const btn = document.createElement('button');
+    btn.className = 'craft-btn';
+    btn.disabled = !affordable;
+    btn.innerHTML = `<div class="ic">${b.icon}</div><div class="nm">${b.name}</div><div class="cst">${costStr}</div>`;
+    btn.addEventListener('click', ()=> craftItem(key));
+    el.appendChild(btn);
+  });
+}
+
+function affixLabel(a){
+  const name = a.stat === 'all' ? 'All Production' : RESOURCE_META[a.stat].label;
+  const icon = a.stat === 'all' ? '🌟' : RESOURCE_META[a.stat].icon;
+  return `${icon} +${a.value}% ${name}`;
+}
+
+function buildItemCard(item, opts){
+  opts = opts || {};
+  const base = BASE_ITEMS[item.base];
+  const rarity = RARITY_BY_COUNT[item.affixes.length];
+  const card = document.createElement('div');
+  card.className = `item-card rarity-${rarity}`;
+  const affixHtml = item.affixes.length
+    ? item.affixes.map(a=>`<li>${affixLabel(a)}</li>`).join('')
+    : `<li class="empty">No properties yet</li>`;
+
+  let actionsHtml = '';
+  if(!opts.equippedView){
+    const eCost = enhanceCost(item), aCost = alterCost(), cCost = chaosCost(item);
+    const canEnhance = item.affixes.length<3 && state.resources.essence>=eCost;
+    const canAlter = item.affixes.length>0 && state.resources.essence>=aCost;
+    const canChaos = item.affixes.length>0 && state.resources.essence>=cCost;
+    actionsHtml = `
+      <div class="item-actions">
+        <button class="orb-btn" data-enhance="${item.id}" ${canEnhance?'':'disabled'}>✨ Enhance (${eCost})</button>
+        <button class="orb-btn" data-alter="${item.id}" ${canAlter?'':'disabled'}>🌀 Alter (${aCost})</button>
+        <button class="orb-btn" data-chaos="${item.id}" ${canChaos?'':'disabled'}>🔥 Chaos (${cCost})</button>
+        <button class="equip-btn" data-equip="${item.id}">Equip</button>
+      </div>`;
+  }
+
+  card.innerHTML = `
+    <div class="item-head">
+      <span class="iname">${base.icon} ${base.name}</span>
+      <span class="irarity">${rarity}</span>
+    </div>
+    <ul class="affix-list">${affixHtml}</ul>
+    ${actionsHtml}
+  `;
+  return card;
+}
+
+function renderInventory(){
+  const el = document.getElementById('inventory-list');
+  el.innerHTML = '';
+  const unequipped = state.items.filter(i=>!i.equipped);
+  if(unequipped.length===0){
+    el.innerHTML = `<div class="empty-msg">No items in your pack. Craft a base item above, then use essence to empower it with orbs.</div>`;
+  } else {
+    unequipped.slice().reverse().forEach(item=>{
+      el.appendChild(buildItemCard(item));
+    });
+  }
+  el.querySelectorAll('[data-enhance]').forEach(b=>b.addEventListener('click', ()=>applyEnhance(+b.getAttribute('data-enhance'))));
+  el.querySelectorAll('[data-alter]').forEach(b=>b.addEventListener('click', ()=>applyAlter(+b.getAttribute('data-alter'))));
+  el.querySelectorAll('[data-chaos]').forEach(b=>b.addEventListener('click', ()=>applyChaos(+b.getAttribute('data-chaos'))));
+  el.querySelectorAll('[data-equip]').forEach(b=>b.addEventListener('click', ()=>equipItem(+b.getAttribute('data-equip'))));
+}
+
+function renderEquipment(){
+  const totalsEl = document.getElementById('equip-totals');
+  const rows = Object.keys(RESOURCE_META).map(res=>{
+    const bonus = (equipmentBonusFor(res)*100);
+    return `<div class="t-row"><span>${RESOURCE_META[res].icon} ${RESOURCE_META[res].label} bonus</span><span>+${bonus.toFixed(1)}%</span></div>`;
+  }).join('');
+  totalsEl.innerHTML = `<h3 style="margin-bottom:6px;font-size:0.8rem;color:var(--bronze-bright);">Total Equipped Bonuses</h3>${rows}`;
+
+  const slotsEl = document.getElementById('equip-slots');
+  slotsEl.innerHTML = '';
+  const slotLabels = {weapon:'Weapon', shield:'Shield', amulet:'Amulet', ring:'Ring'};
+  Object.entries(slotLabels).forEach(([slot,label])=>{
+    const itemId = state.equipment[slot];
+    const wrap = document.createElement('div');
+    wrap.className = 'slot';
+    if(itemId){
+      const item = state.items.find(i=>i.id===itemId);
+      const card = buildItemCard(item, {equippedView:true});
+      wrap.innerHTML = `<div class="slot-name">${label}</div>`;
+      wrap.appendChild(card);
+      const unequipBtn = document.createElement('button');
+      unequipBtn.className = 'unequip-btn';
+      unequipBtn.textContent = 'Unequip';
+      unequipBtn.addEventListener('click', ()=>unequipSlot(slot));
+      wrap.appendChild(unequipBtn);
+    } else {
+      wrap.innerHTML = `<div class="slot-name">${label}</div><div class="empty-slot">Empty — equip an item from the Forge</div>`;
+    }
+    slotsEl.appendChild(wrap);
+  });
+}
+
+function render(){
+  renderResourceBar();
+  renderBuildings();
+  renderCraftGrid();
+  renderInventory();
+  renderEquipment();
+}
+
+// ---------------------------------------------------------------
+// Tabs
+// ---------------------------------------------------------------
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-'+btn.getAttribute('data-tab')).classList.add('active');
+  });
+});
+
+// ---------------------------------------------------------------
+// Save code buttons
+// ---------------------------------------------------------------
+document.getElementById('load-save-btn').addEventListener('click', loadFromPastedCode);
+
+// ---------------------------------------------------------------
+// Reset
+// ---------------------------------------------------------------
+document.getElementById('reset-btn').addEventListener('click', async ()=>{
+  if(!confirm('Reset all progress? This cannot be undone.')) return;
+  state = {
+    resources: {wood:20, stone:20, food:20, gold:15, essence:0},
+    buildings: {sawmill:1, quarry:1, farm:1, mine:0, well:0},
+    items: [],
+    equipment: {weapon:null, shield:null, amulet:null, ring:null},
+    nextItemId: 1,
+    lastTick: Date.now(),
+  };
+  await silentAutosave();
+  document.getElementById('fallback-save-area').style.display = 'none';
+  document.getElementById('fallback-load-area').style.display = 'none';
+  document.getElementById('load-code-box').value = '';
+  render();
+});
+
+// ---------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------
+bootLoad().then(()=>{
+  document.getElementById('storage-mode-line').textContent = describeStorageMode();
+  setInterval(tick, TICK_MS);
+});
+window.addEventListener('beforeunload', ()=>{ silentAutosave(); });
+
+})();
+</script>
+</body>
+</html>
