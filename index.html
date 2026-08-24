@@ -440,8 +440,8 @@ const RESOURCE_CONFIG = {
   wood:    {icon:'🪓', base:0.1, costRes:['stone','food'], costBase:[8,6]},
   stone:   {icon:'⛏️', base:0.1, costRes:['wood','food'],  costBase:[8,6]},
   food:    {icon:'🌾', base:0.1, costRes:['wood','stone'], costBase:[8,8]},
-  gold:    {icon:'💰', base:0.1, costRes:['wood','stone','food'], costBase:[12,12,10]},
-  essence: {icon:'✨', base:0.1, costRes:['gold','food'],  costBase:[20,15]},
+  gold:    {icon:'💰', base:0.1, costRes:['wood','stone','food'], costBase:[10,5,12]},
+  essence: {icon:'✨', base:0.1, costRes:['wood','stone','food'], costBase:[5,12,10]},
 };
 const LAND_NAME_POOL = {
   wood:    ['Northern Woods','Southern Woods','Whispering Pines','Old Growth Forest','Timberfall','Mossy Hollow','Silverleaf Grove'],
@@ -909,7 +909,7 @@ function createInitialState(){
   const usedLandNames = new Set();
   let nextLandId = 1;
   const landSlots = STARTING_LAND_TYPES.map(resource => makeLand(resource, nextLandId++, usedLandNames, true));
-  const startingResources = {wood:20, stone:20, food:20, gold:15, essence:0};
+  const startingResources = {wood:20, stone:20, food:20, gold:20, essence:20};
   const startingInventory = {};
   return {
     resources: startingResources,
