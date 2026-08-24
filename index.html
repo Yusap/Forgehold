@@ -190,6 +190,7 @@
   }
   .upbtn:disabled{background:#3a3226;color:#6b6152;cursor:not-allowed;}
   .upbtn .cost{display:block;font-family:'JetBrains Mono',monospace;font-weight:400;font-size:0.58rem;margin-top:2px;}
+  .cost-insufficient{color:#ff6b6b;font-weight:700;}
 
   h2.section-title{font-size:0.85rem;color:var(--bronze-bright);text-transform:uppercase;letter-spacing:0.1em;margin:18px 0 10px;border-bottom:1px solid var(--line);padding-bottom:6px;}
   .forge-note{font-size:0.72rem;color:var(--parchment-dim);font-style:italic;margin:-4px 0 12px;}
@@ -242,18 +243,19 @@
     border-radius:7px;padding:8px 6px;font-size:0.66rem;font-family:'Cinzel',serif;
     letter-spacing:0.01em;cursor:pointer;text-align:center;
   }
+  .affixbtn-cost{display:block;font-family:'JetBrains Mono',monospace;font-weight:400;font-size:0.58rem;margin-top:2px;color:var(--parchment-dim);}
   .affixbtn:disabled{opacity:0.35;cursor:not-allowed;border-color:var(--line);color:var(--parchment-dim);}
-  .glossary-row{margin-bottom:14px;}
-  .glossary-row h3{font-family:'Cinzel',serif;font-size:0.82rem;color:var(--bronze-bright);margin:0 0 4px;}
-  .glossary-row p{font-size:0.76rem;color:var(--parchment);line-height:1.45;margin:0;}
+  .glossary-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px dashed var(--line);cursor:default;}
+  .glossary-row:first-of-type{border-top:none;}
+  .glossary-icon{font-size:1.1rem;line-height:1;flex-shrink:0;}
+  .glossary-title{font-family:'Cinzel',serif;font-size:0.82rem;color:var(--bronze-bright);}
   .ach-summary{font-size:0.8rem;color:var(--bronze-bright);font-weight:700;margin-bottom:12px;}
   .ach-tier-title{font-family:'Cinzel',serif;font-size:0.78rem;color:var(--bronze-bright);text-transform:uppercase;letter-spacing:0.08em;margin:16px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px;}
   .ach-tier-title:first-of-type{margin-top:0;}
-  .ach-row{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px dashed var(--line);}
+  .ach-row{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px dashed var(--line);cursor:default;}
   .ach-row:first-of-type{border-top:none;}
-  .ach-icon{font-size:1.1rem;line-height:1.3;flex-shrink:0;}
-  .ach-title{font-family:'Cinzel',serif;font-size:0.78rem;margin-bottom:2px;}
-  .ach-desc{font-size:0.7rem;color:var(--parchment-dim);line-height:1.4;}
+  .ach-icon{font-size:1.1rem;line-height:1;flex-shrink:0;}
+  .ach-title{font-family:'Cinzel',serif;font-size:0.78rem;}
   .ach-row.unlocked .ach-title{color:var(--bronze-bright);}
   .ach-row.locked{opacity:0.55;}
   .ach-row.locked .ach-title{color:var(--parchment-dim);}
@@ -331,8 +333,12 @@
   <div class="panel active" id="panel-settlement">
     <div class="settlement-actions">
       <div class="action-card">
-        <div class="label">🧭 Explore</div>
-        <button class="upbtn" id="explore-btn">Explore<span class="cost" id="explore-cost"></span></button>
+        <div class="label">🧭 Explore for Land</div>
+        <button class="upbtn" id="explore-land-btn">Explore<span class="cost" id="explore-land-cost"></span></button>
+      </div>
+      <div class="action-card">
+        <div class="label">📜 Explore for Recipe</div>
+        <button class="upbtn" id="explore-recipe-btn">Explore<span class="cost" id="explore-recipe-cost"></span></button>
       </div>
     </div>
     <div id="pending-land-area"></div>
@@ -457,7 +463,7 @@ const LAND_ITEM_POOL = {
   gold:    { common:{name:'Copper Nugget', icon:'🥉'}, uncommon:{name:'Silver Vein', icon:'🥈'}, rare:{name:'Gold Ingot', icon:'🥇'}, legendary:{name:'Kingsblood Ore', icon:'👑'} },
   essence: { common:{name:'Faint Spark', icon:'💫'}, uncommon:{name:'Mana Shard', icon:'🔹'}, rare:{name:'Arcane Crystal', icon:'🔮'}, legendary:{name:'Starlight Core', icon:'⭐'} },
 };
-const RARITY_DROP_CHANCE = {common:0.06, uncommon:0.02, rare:0.006, legendary:0.0015};
+const RARITY_DROP_CHANCE = {common:0.012, uncommon:0.004, rare:0.0012, legendary:0.0003}; // 1/5 of original rates; currency production is untouched
 
 // ---------------------------------------------------------------
 // Exploration progress — land quality, recipe quality, and drop tiers
@@ -476,8 +482,11 @@ const RARITY_DROP_CHANCE = {common:0.06, uncommon:0.02, rare:0.006, legendary:0.
 // rare things always stay rarer than common ones, however far you go.
 // ---------------------------------------------------------------
 const EXPLORE_PROGRESS_HALFLIFE = 40; // explores to reach halfway to the ceiling
-function explorationProgress(){
-  return 1 - 1/(1 + state.exploreCount/EXPLORE_PROGRESS_HALFLIFE);
+function explorationProgressLand(){
+  return 1 - 1/(1 + state.exploreLandCount/EXPLORE_PROGRESS_HALFLIFE);
+}
+function explorationProgressRecipe(){
+  return 1 - 1/(1 + state.exploreRecipeCount/EXPLORE_PROGRESS_HALFLIFE);
 }
 function lerpWeights(startTable, endTable, t){
   return startTable.map(([key,w0], i)=> [key, w0 + (endTable[i][1]-w0)*t]);
@@ -488,22 +497,23 @@ function lerpWeights(startTable, endTable, t){
 const LAND_SLOT_WEIGHTS_START = [ [0,55],[1,35],[2,9],[3,1],[4,0],[5,0] ];
 const LAND_SLOT_WEIGHTS_END   = [ [0,0], [1,10],[2,20],[3,30],[4,25],[5,15] ];
 function currentLandSlotWeights(){
-  return lerpWeights(LAND_SLOT_WEIGHTS_START, LAND_SLOT_WEIGHTS_END, explorationProgress());
+  return lerpWeights(LAND_SLOT_WEIGHTS_START, LAND_SLOT_WEIGHTS_END, explorationProgressLand());
 }
 // Recipe complexity (number of distinct item costs) — always at least 1,
 // since a recipe needs to cost *something*.
 const RECIPE_TYPE_WEIGHTS_START = [ [1,80],[2,15],[3,4],[4,1],[5,0] ];
 const RECIPE_TYPE_WEIGHTS_END   = [ [1,10],[2,20],[3,25],[4,25],[5,20] ];
 function currentRecipeTypeWeights(){
-  return lerpWeights(RECIPE_TYPE_WEIGHTS_START, RECIPE_TYPE_WEIGHTS_END, explorationProgress());
+  return lerpWeights(RECIPE_TYPE_WEIGHTS_START, RECIPE_TYPE_WEIGHTS_END, explorationProgressRecipe());
 }
-// Tier chosen for each land drop-slot AND each recipe cost-combo. Common
-// always outweighs uncommon, which always outweighs rare, which always
-// outweighs legendary — only the overall spread widens with progress.
+// Tier chosen for each land drop-slot AND each recipe cost-combo. Each uses
+// its own independent progress track (land discovery vs recipe discovery).
+// Common always outweighs uncommon, which always outweighs rare, which
+// always outweighs legendary — only the overall spread widens with progress.
 const TIER_WEIGHTS_START = [ ['common',85],['uncommon',13],['rare',2], ['legendary',0]  ];
 const TIER_WEIGHTS_END   = [ ['common',35],['uncommon',30],['rare',22],['legendary',13] ];
-function currentTierWeights(){
-  return lerpWeights(TIER_WEIGHTS_START, TIER_WEIGHTS_END, explorationProgress());
+function currentTierWeights(progress){
+  return lerpWeights(TIER_WEIGHTS_START, TIER_WEIGHTS_END, progress);
 }
 
 const RECIPE_FLAVORS = ['Sigil','Charm','Talisman','Relic','Rune','Emblem','Token'];
@@ -526,8 +536,8 @@ const AFFIX_TYPES = [
   { key:'doubleHarvest',  needsStat:false, min:2,   max:14 },
   { key:'bonusItem',      needsStat:false, min:1,   max:8  },
   { key:'upgradeCostDown',needsStat:false, min:3,   max:22 },
-  { key:'exploreCostDown',needsStat:false, min:3,   max:18 },
-  { key:'recipeFindUp',   needsStat:false, min:3,   max:18 },
+  { key:'landExploreCostDown',   needsStat:false, min:3, max:18 },
+  { key:'recipeExploreCostDown', needsStat:false, min:3, max:18 },
   { key:'conversion',     needsStat:true,  allowAll:false, min:8,   max:35 },
   { key:'synergy',        needsStat:false, min:25,  max:65 },
 ];
@@ -572,8 +582,8 @@ function describeAffix(affix){
     case 'doubleHarvest': return `${affix.value}% chance of a double harvest`;
     case 'bonusItem': return `${affix.value}% chance of a bonus item from elsewhere`;
     case 'upgradeCostDown': return `-${affix.value}% upgrade cost (this land)`;
-    case 'exploreCostDown': return `-${affix.value}% Explore cost`;
-    case 'recipeFindUp': return `+${affix.value}% chance to find Recipes exploring`;
+    case 'landExploreCostDown': return `-${affix.value}% Explore-for-Land (Essence) cost`;
+    case 'recipeExploreCostDown': return `-${affix.value}% Explore-for-Recipe (Gold) cost`;
     case 'conversion': return `Converts ${affix.value}% of this land's output into ${s}`;
     case 'synergy': return `Shares ${affix.value}% of this land's bonus with its sibling`;
     default: return 'Unknown affix';
@@ -581,27 +591,43 @@ function describeAffix(affix){
 }
 
 // ---------------------------------------------------------------
-// Crafting Station modification cost — every button (Add/Reroll All/
-// Reroll One/Remove/Change Land Type) spends 1 unit of a tiered drop
-// item bound to the item's own "land type". The tier escalates each
-// time the item is modified: 1st mod = common, 2nd = uncommon,
-// 3rd = rare, 4th+ = legendary.
+// Crafting Station modification cost — each of the 5 actions draws from
+// its own fixed resource, completely independent of the item's own
+// bound resource (landType). Each action escalates through its own
+// 4-use counter: 1st use = common, 2nd = uncommon, 3rd = rare,
+// 4th+ = legendary — tracked per action, per item, so hammering Add
+// Affix doesn't affect Reroll All's cost on the same item.
 // ---------------------------------------------------------------
-function modCostTier(item){
-  return TIERS[Math.min(item.modCount||0, TIERS.length-1)];
+const ACTION_RESOURCE = {
+  add: 'wood',
+  rerollAll: 'stone',
+  rerollOne: 'gold',
+  remove: 'food',
+  changeType: 'essence',
+};
+const ACTION_LABEL = {
+  add: 'Add Affix',
+  rerollAll: 'Reroll All',
+  rerollOne: 'Reroll One',
+  remove: 'Remove Affix',
+  changeType: 'Change Land Type',
+};
+function modCostTier(item, actionKey){
+  return TIERS[Math.min((item.modCounts&&item.modCounts[actionKey])||0, TIERS.length-1)];
 }
-function modCostKey(item){
-  return `${item.landType}-${modCostTier(item)}`;
+function modCostKey(item, actionKey){
+  return `${ACTION_RESOURCE[actionKey]}-${modCostTier(item, actionKey)}`;
 }
-function modCostCollectible(item){
-  return LAND_ITEM_POOL[item.landType][modCostTier(item)];
+function modCostCollectible(item, actionKey){
+  return LAND_ITEM_POOL[ACTION_RESOURCE[actionKey]][modCostTier(item, actionKey)];
 }
-function canPayModCost(item){
-  return (state.inventory[modCostKey(item)]||0) >= 1;
+function canPayModCost(item, actionKey){
+  return (state.inventory[modCostKey(item, actionKey)]||0) >= 1;
 }
-function payModCost(item){
-  const key = modCostKey(item);
+function payModCost(item, actionKey){
+  const key = modCostKey(item, actionKey);
   state.inventory[key] = (state.inventory[key]||0) - 1;
+  item.modCounts[actionKey] = (item.modCounts[actionKey]||0) + 1;
 }
 
 // ---------------------------------------------------------------
@@ -611,75 +637,71 @@ function payModCost(item){
 // ---------------------------------------------------------------
 const AFFIX_GLOSSARY_TEXT = {
   prodBoost: {
-    label: 'Production Boost',
+    icon: '📈', label: 'Production Boost',
     desc: d => `Increases a land's output by a flat percentage, rolled ${d.min}%–${d.max}%. Rolls a specific resource, or "All" (30% chance) to boost every resource that land produces.`,
   },
   flatBonus: {
-    label: 'Flat Bonus',
+    icon: '➕', label: 'Flat Bonus',
     desc: d => `Adds a flat amount of production per second (rolled ${d.min}–${d.max}) to a land whose resource matches the affix. Does nothing if attached to a land of a different resource.`,
   },
   dropTierUp: {
-    label: 'Drop Tier Up',
+    icon: '⬆️', label: 'Drop Tier Up',
     desc: d => `Whenever this land's drop roll succeeds, ${d.min}%–${d.max}% chance the tier is bumped up one step (Common → Uncommon → Rare → Legendary; Legendary can't go higher).`,
   },
   rareChance: {
-    label: 'Rare Chance',
+    icon: '🎲', label: 'Rare Chance',
     desc: d => `Adds ${d.min}%–${d.max}% directly to this land's Rare and Legendary drop-slot odds only — Common and Uncommon odds are unaffected.`,
   },
   dupDrop: {
-    label: 'Duplicate Drop',
+    icon: '👥', label: 'Duplicate Drop',
     desc: d => `${d.min}%–${d.max}% chance that any drop this land successfully rolls is granted a second time too.`,
   },
   doubleHarvest: {
-    label: 'Double Harvest',
+    icon: '🌾', label: 'Double Harvest',
     desc: d => `Effectively a ${d.min}%–${d.max}% production boost, applied as a smooth average rather than an actual random double — so output stays steady, not spiky.`,
   },
   bonusItem: {
-    label: 'Bonus Item',
+    icon: '🎁', label: 'Bonus Item',
     desc: d => `Each tick, ${d.min}%–${d.max}% chance this land also grants one Common-tier item of a random other resource, independent of its own drop slots.`,
   },
   upgradeCostDown: {
-    label: 'Upgrade Cost Down',
+    icon: '💸', label: 'Upgrade Cost Down',
     desc: d => `Reduces this specific land's next upgrade cost by ${d.min}%–${d.max}% (total reduction from all sources on one land is capped at 85%).`,
   },
-  exploreCostDown: {
-    label: 'Explore Cost Down',
-    desc: d => `Global — active as long as the item is attached anywhere in your settlement. Reduces the Explore button's gold cost by ${d.min}%–${d.max}% (capped at 85% total).`,
+  landExploreCostDown: {
+    icon: '🧭', label: 'Land Explore Cost Down',
+    desc: d => `Global — active as long as the item is attached anywhere. Reduces Explore-for-Land's Essence cost by ${d.min}%–${d.max}% (capped at 85% total).`,
   },
-  recipeFindUp: {
-    label: 'Recipe Find Up',
-    desc: d => `Global. Shifts Explore's base 50/50 outcome toward Recipes by ${d.min}–${d.max} percentage points. Land odds can never drop below 10%, however many of these you stack.`,
+  recipeExploreCostDown: {
+    icon: '📜', label: 'Recipe Explore Cost Down',
+    desc: d => `Global — active as long as the item is attached anywhere. Reduces Explore-for-Recipe's Gold cost by ${d.min}%–${d.max}% (capped at 85% total).`,
   },
   conversion: {
-    label: 'Conversion',
+    icon: '🔄', label: 'Conversion',
     desc: d => `Redirects ${d.min}%–${d.max}% of this land's own production into a different resource instead of its native one. Each conversion affix is capped at 90% siphoned, and has no effect if it happens to target the land's own resource.`,
   },
   synergy: {
-    label: 'Synergy',
+    icon: '🔗', label: 'Synergy',
     desc: d => `Echoes this land's own Production Boost bonus onto every other land of the same resource type, at ${d.min}%–${d.max}% strength. Only Production Boost is shared — other affix types are not.`,
   },
 };
 function buildGlossaryHtml(){
   const affixRows = AFFIX_TYPES.map(def=>{
     const info = AFFIX_GLOSSARY_TEXT[def.key];
-    return `<div class="glossary-row"><h3>${info.label}</h3><p>${info.desc(def)}</p></div>`;
+    return `<div class="glossary-row" title="${info.desc(def)}"><span class="glossary-icon">${info.icon}</span><span class="glossary-title">${info.label}</span></div>`;
   }).join('');
   return `
-    <div class="glossary-row">
-      <h3>Drops</h3>
-      <p>Passive loot your lands generate over time (e.g. Oak Log, Gold Ingot). Your starting lands are "basic" and have no drop slots of their own — only lands found through Exploring can roll drop slots (0–5 of them, each a fixed rarity tier). Drops are spent as crafting currency, tracked in the Inventory tab.</p>
+    <div class="glossary-row" title="Passive loot your lands generate over time (e.g. Oak Log, Gold Ingot). Your starting lands are &quot;basic&quot; and have no drop slots of their own — only lands found through Exploring can roll drop slots (0–5 of them, each a fixed rarity tier). Drops are spent as crafting currency, tracked in the Inventory tab.">
+      <span class="glossary-icon">📦</span><span class="glossary-title">Drops</span>
     </div>
-    <div class="glossary-row">
-      <h3>Items</h3>
-      <p>Crafted from a Recipe by spending drops. An item carries up to ${MAX_AFFIXES} affixes and stays attached to a land indefinitely, doing its job, until you swap or discard it.</p>
+    <div class="glossary-row" title="Crafted from a Recipe by spending drops. An item carries up to ${MAX_AFFIXES} affixes, is bound to one resource, and only attaches to a land of that same resource. Stays attached indefinitely until you swap or discard it.">
+      <span class="glossary-icon">⚒️</span><span class="glossary-title">Items</span>
     </div>
-    <div class="glossary-row">
-      <h3>Land-Bound Modifications</h3>
-      <p>Every item is bound to one resource type. Modifying it at the Crafting Station (Add, Reroll All, Reroll One, Remove, or Change Land Type) costs 1 drop item of that resource — and the required tier escalates with each modification: the 1st costs a Common drop, the 2nd an Uncommon, the 3rd a Rare, and the 4th onward a Legendary. Change Land Type rebinds the item to a different resource if you're out of its current one.</p>
+    <div class="glossary-row" title="Each of the 5 Crafting Station actions draws from its own fixed resource (Add=Wood, Reroll All=Stone, Reroll One=Gold, Remove=Food, Change Land Type=Essence), independent of the item's own bound resource. Each action escalates through its own 4 uses: 1st=Common, 2nd=Uncommon, 3rd=Rare, 4th+=Legendary. Change Land Type rebinds the item to a new resource, renaming it and remapping any resource-specific affixes to match.">
+      <span class="glossary-icon">🔨</span><span class="glossary-title">Crafting Costs</span>
     </div>
-    <div class="glossary-row">
-      <h3>Exploration Progress</h3>
-      <p>The more you've explored, the pricier Explore gets — and the better its finds get too. Early explores mostly turn up plain land and weak, cheap Recipes; later explores favor land with more drop slots and higher tiers, and Recipes that demand (and reward) more. Common drops always stay more likely than rare ones, however far you've progressed.</p>
+    <div class="glossary-row" title="Explore for Land (Essence) and Explore for Recipe (Gold) are separate actions with independent costs and quality curves. The more you've used each, the pricier it gets — and the better its finds get too, approaching (but never fully reaching) a ceiling. Common drops always stay more likely than rare ones, however far you've progressed.">
+      <span class="glossary-icon">🧭</span><span class="glossary-title">Exploration Progress</span>
     </div>
     <h2 class="section-title" style="margin-top:18px;">Affixes</h2>
     ${affixRows}
@@ -698,7 +720,7 @@ const STARTING_LAND_TYPES = ['wood','wood','stone','gold','food','essence'];
 const ACHIEVEMENTS = [
   // Easy
   {id:'first_steps', tier:'easy', title:'First Steps', desc:'Use Explore for the first time.',
-    check: s => s.exploreCount >= 1},
+    check: s => s.exploreLandCount >= 1 || s.exploreRecipeCount >= 1},
   {id:'finders_keepers', tier:'easy', title:'Finders Keepers', desc:'Collect your first drop item of any kind.',
     check: s => s.lifetimeStats.totalDropsEver >= 1},
   {id:'blueprint_found', tier:'easy', title:'Blueprint Found', desc:'Discover your first Recipe.',
@@ -764,12 +786,9 @@ function buildAchievementsHtml(){
     html += `<h3 class="ach-tier-title">${tierLabel[tier]}</h3>`;
     ACHIEVEMENTS.filter(a=>a.tier===tier).forEach(a=>{
       const unlocked = !!state.achievementsUnlocked[a.id];
-      html += `<div class="ach-row ${unlocked?'unlocked':'locked'}">
+      html += `<div class="ach-row ${unlocked?'unlocked':'locked'}" title="${a.desc}">
         <div class="ach-icon">${unlocked?'🏆':'🔒'}</div>
-        <div class="ach-body">
-          <div class="ach-title">${a.title}</div>
-          <div class="ach-desc">${a.desc}</div>
-        </div>
+        <div class="ach-title">${a.title}</div>
       </div>`;
     });
   });
@@ -808,7 +827,7 @@ function shuffledCopy(arr){
 function rollDropSlots(){
   const numSlots = weightedPick(currentLandSlotWeights());
   const slots = [];
-  for(let i=0;i<numSlots;i++) slots.push(weightedPick(currentTierWeights()));
+  for(let i=0;i<numSlots;i++) slots.push(weightedPick(currentTierWeights(explorationProgressLand())));
   return slots;
 }
 function pickLandName(resource, usedNames){
@@ -855,7 +874,7 @@ function pickRecipeCombos(numTypes){
   while(chosen.length < numTypes && guard < 200){
     guard++;
     const res = RESOURCE_KEYS[Math.floor(Math.random()*RESOURCE_KEYS.length)];
-    const tier = weightedPick(currentTierWeights()); // same progress-scaled odds as land drops
+    const tier = weightedPick(currentTierWeights(explorationProgressRecipe())); // recipe's own independent progress track
     const key = `${res}-${tier}`;
     if(!used.has(key)){
       used.add(key);
@@ -884,7 +903,7 @@ function makeRecipe(id){
   const name = effectType === 'single' ? `${RESOURCE_META[effectStat].label} ${flavor}` : `Universal ${flavor}`;
   const icon = effectType === 'single' ? RESOURCE_META[effectStat].icon : '🌟';
   const rarity = rarityForDemand(totalDemand);
-  return {id, name, icon, costs, effectType, effectStat, effectValue, rarity};
+  return {id, name, icon, costs, effectType, effectStat, effectValue, rarity, flavor};
 }
 function createInitialState(){
   const usedLandNames = new Set();
@@ -896,7 +915,8 @@ function createInitialState(){
     resources: startingResources,
     landSlots,
     pendingLand: null,
-    exploreCount: 0,
+    exploreLandCount: 0,
+    exploreRecipeCount: 0,
     nextLandId,
     recipes: [],
     recipeFilterMode: 'best',
@@ -1030,9 +1050,13 @@ function productionRate(res){
   occupiedLands().forEach(land=>{ sum += landOutputs(land)[res] || 0; });
   return sum;
 }
-function exploreCost(){
-  const discount = Math.min(0.85, globalAffixSum('exploreCostDown')/100);
-  return Math.ceil(15 * Math.pow(1.15, state.exploreCount) * (1-discount));
+function exploreLandCost(){
+  const discount = Math.min(0.85, globalAffixSum('landExploreCostDown')/100);
+  return Math.ceil(15 * Math.pow(1.15, state.exploreLandCount) * (1-discount));
+}
+function exploreRecipeCost(){
+  const discount = Math.min(0.85, globalAffixSum('recipeExploreCostDown')/100);
+  return Math.ceil(15 * Math.pow(1.15, state.exploreRecipeCount) * (1-discount));
 }
 function toast(msg){
   const t = document.getElementById('toast');
@@ -1295,23 +1319,27 @@ function upgradeLand(slotIndex){
   silentAutosave();
   render();
 }
-function explore(){
-  const cost = exploreCost();
-  if(state.resources.gold < cost) return;
+function exploreForLand(){
+  const cost = exploreLandCost();
+  if(state.resources.essence < cost) return;
   if(state.pendingLand){ toast('Place or discard your current discovery first.'); return; }
+  state.resources.essence -= cost;
+  state.exploreLandCount++;
+  const resource = RESOURCE_KEYS[Math.floor(Math.random()*RESOURCE_KEYS.length)];
+  const usedNames = new Set(occupiedLands().map(l=>l.name));
+  state.pendingLand = makeLand(resource, state.nextLandId++, usedNames);
+  toast(`Your scouts found ${state.pendingLand.name}, a new ${LAND_TYPE_LABEL[resource]} plot.`);
+  silentAutosave();
+  render();
+}
+function exploreForRecipe(){
+  const cost = exploreRecipeCost();
+  if(state.resources.gold < cost) return;
   state.resources.gold -= cost;
-  state.exploreCount++;
-  const landThreshold = Math.max(0.1, 0.5 - globalAffixSum('recipeFindUp')/100);
-  if(Math.random() < landThreshold){
-    const resource = RESOURCE_KEYS[Math.floor(Math.random()*RESOURCE_KEYS.length)];
-    const usedNames = new Set(occupiedLands().map(l=>l.name));
-    state.pendingLand = makeLand(resource, state.nextLandId++, usedNames);
-    toast(`Your scouts found ${state.pendingLand.name}, a new ${LAND_TYPE_LABEL[resource]} plot.`);
-  } else {
-    const recipe = makeRecipe(state.nextRecipeId++);
-    state.recipes.push(recipe);
-    toast(`Your scouts uncovered a recipe: ${recipe.icon} ${recipe.name}!`);
-  }
+  state.exploreRecipeCount++;
+  const recipe = makeRecipe(state.nextRecipeId++);
+  state.recipes.push(recipe);
+  toast(`Your scouts uncovered a recipe: ${recipe.icon} ${recipe.name}!`);
   silentAutosave();
   render();
 }
@@ -1370,10 +1398,11 @@ function craftFromRecipe(recipeId){
     id: state.nextItemId++,
     name: recipe.name,
     icon: recipe.icon,
+    flavor: recipe.flavor,
     rarity: recipe.rarity,
     affixes: [initialAffix],
     landType,
-    modCount: 0,
+    modCounts: {add:0, rerollAll:0, rerollOne:0, remove:0, changeType:0},
     attachedTo: null,
   };
   state.items.push(item);
@@ -1385,22 +1414,20 @@ function craftFromRecipe(recipeId){
   render();
 }
 function compatibleLandsForItem(item){
-  // Items can hold affixes targeting different resources at once,
-  // so any item can be attached to any occupied land.
-  return occupiedLands();
+  // An item can only be attached to a land matching its own bound resource.
+  return occupiedLands().filter(l => l.resource === item.landType);
 }
 function addAffix(itemId){
   const item = findItem(itemId);
   if(!item) return;
   if(item.affixes.length >= MAX_AFFIXES){ toast('This item already has the maximum of 4 affixes.'); return; }
-  if(!canPayModCost(item)){ toast(`Not enough ${modCostCollectible(item).name} to modify this item.`); return; }
-  payModCost(item);
+  if(!canPayModCost(item,'add')){ toast(`Not enough ${modCostCollectible(item,'add').name} to add an affix.`); return; }
+  payModCost(item,'add');
   const affix = rollAffix(item.affixes);
   item.affixes.push(affix);
-  item.modCount = (item.modCount||0) + 1;
   state.lifetimeStats.modActionsUsed.add = true;
   state.lifetimeStats.affixTypesSeenEver[affix.type] = true;
-  state.lifetimeStats.maxModCountEver = Math.max(state.lifetimeStats.maxModCountEver||0, item.modCount);
+  state.lifetimeStats.maxModCountEver = Math.max(state.lifetimeStats.maxModCountEver||0, item.modCounts.add);
   toast(`New affix: ${describeAffix(affix)}`);
   silentAutosave();
   render();
@@ -1408,16 +1435,15 @@ function addAffix(itemId){
 function rerollAllAffixes(itemId){
   const item = findItem(itemId);
   if(!item || item.affixes.length === 0) return;
-  if(!canPayModCost(item)){ toast(`Not enough ${modCostCollectible(item).name} to modify this item.`); return; }
-  payModCost(item);
+  if(!canPayModCost(item,'rerollAll')){ toast(`Not enough ${modCostCollectible(item,'rerollAll').name} to reroll all affixes.`); return; }
+  payModCost(item,'rerollAll');
   const count = item.affixes.length;
   const fresh = [];
   for(let i=0;i<count;i++) fresh.push(rollAffix(fresh));
   item.affixes = fresh;
-  item.modCount = (item.modCount||0) + 1;
   state.lifetimeStats.modActionsUsed.rerollAll = true;
   fresh.forEach(a=>{ state.lifetimeStats.affixTypesSeenEver[a.type] = true; });
-  state.lifetimeStats.maxModCountEver = Math.max(state.lifetimeStats.maxModCountEver||0, item.modCount);
+  state.lifetimeStats.maxModCountEver = Math.max(state.lifetimeStats.maxModCountEver||0, item.modCounts.rerollAll);
   toast(`${item.icon} ${item.name}'s affixes were rerolled.`);
   silentAutosave();
   render();
@@ -1425,16 +1451,15 @@ function rerollAllAffixes(itemId){
 function rerollOneAffix(itemId){
   const item = findItem(itemId);
   if(!item || item.affixes.length === 0) return;
-  if(!canPayModCost(item)){ toast(`Not enough ${modCostCollectible(item).name} to modify this item.`); return; }
-  payModCost(item);
+  if(!canPayModCost(item,'rerollOne')){ toast(`Not enough ${modCostCollectible(item,'rerollOne').name} to reroll an affix.`); return; }
+  payModCost(item,'rerollOne');
   const idx = Math.floor(Math.random()*item.affixes.length);
   const others = item.affixes.filter((_,i)=>i!==idx);
   const fresh = rollAffix(others);
   item.affixes[idx] = fresh;
-  item.modCount = (item.modCount||0) + 1;
   state.lifetimeStats.modActionsUsed.rerollOne = true;
   state.lifetimeStats.affixTypesSeenEver[fresh.type] = true;
-  state.lifetimeStats.maxModCountEver = Math.max(state.lifetimeStats.maxModCountEver||0, item.modCount);
+  state.lifetimeStats.maxModCountEver = Math.max(state.lifetimeStats.maxModCountEver||0, item.modCounts.rerollOne);
   toast(`Affix rerolled: ${describeAffix(fresh)}`);
   silentAutosave();
   render();
@@ -1442,13 +1467,12 @@ function rerollOneAffix(itemId){
 function removeRandomAffix(itemId){
   const item = findItem(itemId);
   if(!item || item.affixes.length === 0) return;
-  if(!canPayModCost(item)){ toast(`Not enough ${modCostCollectible(item).name} to modify this item.`); return; }
-  payModCost(item);
+  if(!canPayModCost(item,'remove')){ toast(`Not enough ${modCostCollectible(item,'remove').name} to remove an affix.`); return; }
+  payModCost(item,'remove');
   const idx = Math.floor(Math.random()*item.affixes.length);
   const [removed] = item.affixes.splice(idx,1);
-  item.modCount = (item.modCount||0) + 1;
   state.lifetimeStats.modActionsUsed.remove = true;
-  state.lifetimeStats.maxModCountEver = Math.max(state.lifetimeStats.maxModCountEver||0, item.modCount);
+  state.lifetimeStats.maxModCountEver = Math.max(state.lifetimeStats.maxModCountEver||0, item.modCounts.remove);
   toast(`Removed affix: ${describeAffix(removed)}`);
   silentAutosave();
   render();
@@ -1456,14 +1480,19 @@ function removeRandomAffix(itemId){
 function changeLandType(itemId){
   const item = findItem(itemId);
   if(!item) return;
-  if(!canPayModCost(item)){ toast(`Not enough ${modCostCollectible(item).name} to modify this item.`); return; }
-  payModCost(item);
-  const others = RESOURCE_KEYS.filter(r=>r!==item.landType);
+  if(!canPayModCost(item,'changeType')){ toast(`Not enough ${modCostCollectible(item,'changeType').name} to retype this item.`); return; }
+  payModCost(item,'changeType');
+  const oldType = item.landType;
+  const others = RESOURCE_KEYS.filter(r=>r!==oldType);
   const newType = others[Math.floor(Math.random()*others.length)];
   item.landType = newType;
-  item.modCount = (item.modCount||0) + 1;
+  // Resource-specific affixes follow the item to its new identity; 'all'
+  // and non-resource affixes (drop chance, synergy, etc.) are unaffected.
+  item.affixes.forEach(a=>{ if(a.stat === oldType) a.stat = newType; });
+  item.name = `${RESOURCE_META[newType].label} ${item.flavor}`;
+  item.icon = RESOURCE_META[newType].icon;
   state.lifetimeStats.modActionsUsed.changeType = true;
-  state.lifetimeStats.maxModCountEver = Math.max(state.lifetimeStats.maxModCountEver||0, item.modCount);
+  state.lifetimeStats.maxModCountEver = Math.max(state.lifetimeStats.maxModCountEver||0, item.modCounts.changeType);
   toast(`${item.icon} ${item.name} is now bound to ${RESOURCE_META[newType].label}.`);
   silentAutosave();
   render();
@@ -1602,10 +1631,15 @@ function renderPendingLand(){
 }
 
 function renderSpots(){
-  const exploreBtn = document.getElementById('explore-btn');
-  const eCost = exploreCost();
-  exploreBtn.disabled = state.resources.gold < eCost || !!state.pendingLand;
-  document.getElementById('explore-cost').textContent = `💰${fmt(eCost)}`;
+  const exploreLandBtn = document.getElementById('explore-land-btn');
+  const landCost = exploreLandCost();
+  exploreLandBtn.disabled = state.resources.essence < landCost || !!state.pendingLand;
+  document.getElementById('explore-land-cost').textContent = `✨${fmt(landCost)}`;
+
+  const exploreRecipeBtn = document.getElementById('explore-recipe-btn');
+  const recipeCost = exploreRecipeCost();
+  exploreRecipeBtn.disabled = state.resources.gold < recipeCost;
+  document.getElementById('explore-recipe-cost').textContent = `💰${fmt(recipeCost)}`;
 
   renderPendingLand();
 
@@ -1625,7 +1659,10 @@ function renderSpots(){
     const meta = RESOURCE_META[land.resource];
     const cost = costForLand(land);
     const affordable = canAfford(cost);
-    const costStr = Object.entries(cost).map(([r,a])=> `${RESOURCE_META[r].icon}${fmt(a)}`).join(' ');
+    const costStr = Object.entries(cost).map(([r,a])=>{
+      const short = state.resources[r] < a;
+      return `<span class="${short?'cost-insufficient':''}">${RESOURCE_META[r].icon}${fmt(a)}</span>`;
+    }).join(' ');
     const rate = landProductionRate(land);
 
     card.className = 'spot-card';
@@ -1666,8 +1703,10 @@ function updateSpotsLive(){
       upgradeBtn.disabled = !canAfford(costForLand(land));
     }
   });
-  const exploreBtn = document.getElementById('explore-btn');
-  if(exploreBtn) exploreBtn.disabled = state.resources.gold < exploreCost() || !!state.pendingLand;
+  const exploreLandBtn = document.getElementById('explore-land-btn');
+  if(exploreLandBtn) exploreLandBtn.disabled = state.resources.essence < exploreLandCost() || !!state.pendingLand;
+  const exploreRecipeBtn = document.getElementById('explore-recipe-btn');
+  if(exploreRecipeBtn) exploreRecipeBtn.disabled = state.resources.gold < exploreRecipeCost();
 }
 
 function renderRecipes(){
@@ -1753,7 +1792,7 @@ function buildUnattachedItemCard(item){
   const compatibleLands = compatibleLandsForItem(item);
   let landsHtml;
   if(compatibleLands.length === 0){
-    landsHtml = `<div style="font-size:0.72rem;color:var(--parchment-dim);padding:6px 0;">No land available yet — explore or swap one in first.</div>`;
+    landsHtml = `<div style="font-size:0.72rem;color:var(--parchment-dim);padding:6px 0;">No ${LAND_TYPE_LABEL[item.landType]} land available yet — explore or swap one in first.</div>`;
   } else {
     landsHtml = compatibleLands.map(l=>`
       <div class="attach-land-row">
@@ -1764,22 +1803,25 @@ function buildUnattachedItemCard(item){
   }
   const atMax = item.affixes.length >= MAX_AFFIXES;
   const empty = item.affixes.length === 0;
-  const costCollectible = modCostCollectible(item);
-  const costLabel = `${costCollectible.icon} ${costCollectible.name}`;
-  const canPay = canPayModCost(item);
   const boundLabel = `${RESOURCE_META[item.landType].icon} ${RESOURCE_META[item.landType].label}-bound`;
+  function actionBtn(actionKey, extraDisabled, dataAttr){
+    const collectible = modCostCollectible(item, actionKey);
+    const canPay = canPayModCost(item, actionKey);
+    const disabled = extraDisabled || !canPay;
+    return `<button class="affixbtn" ${dataAttr}="${item.id}" ${disabled?'disabled':''} title="${ACTION_LABEL[actionKey]} — costs 1 ${collectible.icon} ${collectible.name}">${ACTION_LABEL[actionKey]}<span class="affixbtn-cost">${collectible.icon} ${collectible.name}</span></button>`;
+  }
   card.innerHTML = `
     <div class="item-head">
       <span class="iname">${item.icon} ${item.name}<span class="rarity-badge rarity-${r}">${rarityLabel(r)}</span></span>
     </div>
-    <div class="mod-bound-line">${boundLabel} — next modification costs 1 ${costLabel}</div>
+    <div class="mod-bound-line">${boundLabel} — only attaches to ${LAND_TYPE_LABEL[item.landType]} land</div>
     ${itemAffixesHtml(item)}
     <div class="affix-actions">
-      <button class="affixbtn" data-affix-add="${item.id}" ${(atMax||!canPay)?'disabled':''} title="Add a new random affix (max ${MAX_AFFIXES}) — costs 1 ${costLabel}">Add Affix</button>
-      <button class="affixbtn" data-affix-reroll-all="${item.id}" ${(empty||!canPay)?'disabled':''} title="Reroll every affix on this item — costs 1 ${costLabel}">Reroll All</button>
-      <button class="affixbtn" data-affix-reroll-one="${item.id}" ${(empty||!canPay)?'disabled':''} title="Reroll one random affix — costs 1 ${costLabel}">Reroll One</button>
-      <button class="affixbtn" data-affix-remove="${item.id}" ${(empty||!canPay)?'disabled':''} title="Remove one random affix — costs 1 ${costLabel}">Remove Affix</button>
-      <button class="affixbtn" data-affix-retype="${item.id}" ${!canPay?'disabled':''} title="Rebind this item to a different resource type — costs 1 ${costLabel}">Change Land Type</button>
+      ${actionBtn('add', atMax, 'data-affix-add')}
+      ${actionBtn('rerollAll', empty, 'data-affix-reroll-all')}
+      ${actionBtn('rerollOne', empty, 'data-affix-reroll-one')}
+      ${actionBtn('remove', empty, 'data-affix-remove')}
+      ${actionBtn('changeType', false, 'data-affix-retype')}
     </div>
     <div class="attach-lands">${landsHtml}</div>
     <div class="item-actions">
@@ -1881,7 +1923,8 @@ document.querySelectorAll('.tab-btn[data-tab]').forEach(btn=>{
 
 document.getElementById('header-save-btn').addEventListener('click', saveGame);
 document.getElementById('header-load-btn').addEventListener('click', loadGame);
-document.getElementById('explore-btn').addEventListener('click', explore);
+document.getElementById('explore-land-btn').addEventListener('click', exploreForLand);
+document.getElementById('explore-recipe-btn').addEventListener('click', exploreForRecipe);
 document.querySelectorAll('.filter-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     state.recipeFilterMode = btn.getAttribute('data-filter-mode');
