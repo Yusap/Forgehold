@@ -108,10 +108,16 @@
   .settlement-actions .action-card .label{font-family:'Cinzel',serif;font-size:0.72rem;color:var(--parchment);margin-bottom:6px;}
 
   .pending-card{
-    background:var(--surface2);border:1px solid var(--violet);border-radius:10px;
+    position:relative;background:var(--surface2);border:1px solid var(--violet);border-radius:10px;
     padding:12px 14px;margin-bottom:14px;
   }
-  .pending-card .p-title{font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--violet-bright);margin-bottom:6px;}
+  .pending-discard-x{
+    position:absolute;top:8px;right:8px;background:none;border:1px solid var(--line);
+    color:var(--parchment-dim);border-radius:50%;width:26px;height:26px;line-height:1;
+    font-size:0.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  }
+  .pending-discard-x:active{color:var(--parchment);border-color:var(--violet-bright);}
+  .pending-card .p-title{font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--violet-bright);margin-bottom:6px;padding-right:30px;}
   .pending-card .p-name{font-family:'Cinzel',serif;font-size:1rem;margin-bottom:2px;}
   .pending-card .p-level{font-size:0.7rem;color:var(--parchment-dim);margin-bottom:6px;}
   .pending-target-grid{
@@ -379,8 +385,8 @@
     <div class="res wood"><div class="res-icon">🪵</div><div class="amt mono" id="r-wood">0</div><div class="rate mono" id="rt-wood">+0/s</div></div>
     <div class="res stone"><div class="res-icon">🪨</div><div class="amt mono" id="r-stone">0</div><div class="rate mono" id="rt-stone">+0/s</div></div>
     <div class="res food"><div class="res-icon">🌾</div><div class="amt mono" id="r-food">0</div><div class="rate mono" id="rt-food">+0/s</div></div>
-    <div class="res gold"><div class="res-icon">💰</div><div class="amt mono" id="r-gold">0</div><div class="rate mono" id="rt-gold">+0/s</div></div>
     <div class="res essence"><div class="res-icon">✨</div><div class="amt mono" id="r-essence">0</div><div class="rate mono" id="rt-essence">+0/s</div></div>
+    <div class="res gold"><div class="res-icon">💰</div><div class="amt mono" id="r-gold">0</div><div class="rate mono" id="rt-gold">+0/s</div></div>
   </div>
 </header>
 
@@ -523,8 +529,8 @@ const LAND_NAME_POOL = {
   gold:    ['Shallow Mine','Deep Mine','Glittering Shaft','Nugget Hollow','Coinvein','Ore Ridge','Sunken Vault'],
   essence: ['Moonwell','Starwell','Arcane Spring','Whisper Grove','Etherfall','Mystic Hollow','Sable Sanctum'],
 };
-const COST_GROWTH = 1.18;
-const GLOBAL_SPEED = 0.2; // 1/5th pace — slows the whole game 5x
+const COST_GROWTH = 1.2; // upgrade cost growth per level
+const GLOBAL_SPEED = 0.02; // 1/50th pace overall (an additional 10x on top of the previous 5x slowdown)
 
 // Collectible land resources — one item per resource type per rarity tier.
 // These have no use yet; they're tracked in the Inventory tab.
@@ -1131,7 +1137,13 @@ function landConversions(land){
 }
 function landProductionRate(land){
   const cfg = RESOURCE_CONFIG[land.resource];
-  const base = cfg.base * land.level;
+  // Production now grows exponentially at the SAME rate (COST_GROWTH,
+  // 120%) as upgrade cost does, instead of linearly — a linear income
+  // curve against an exponential cost curve stopped making sense at
+  // higher levels (upgrades kept getting relatively more expensive
+  // forever). Now the ratio of income to upgrade cost stays roughly
+  // constant at any level.
+  const base = cfg.base * Math.pow(COST_GROWTH, land.level);
   const boost = landOwnProdBoost(land) + landSynergyInflow(land);
   const flat = landFlatBonus(land) + (land.rushFlatBonus||0);
   const doubleMult = 1 + landAffixSum(land,'doubleHarvest')/100;
@@ -1968,12 +1980,12 @@ function renderPendingLand(){
   const card = document.createElement('div');
   card.className = 'pending-card';
   card.innerHTML = `
+    <button class="pending-discard-x" id="pending-discard-btn" title="Discard this discovery" aria-label="Discard this discovery">✕</button>
     <div class="p-title">New discovery — choose where to place it</div>
     <div class="p-name">${meta.icon} ${land.name} <span class="spot-type-badge">${LAND_TYPE_LABEL[land.resource]}</span></div>
     <div class="p-level">Level ${land.level}</div>
     <div class="spot-yield">${buildYieldChips(land)}</div>
     <div class="pending-target-grid">${targetsHtml}</div>
-    <button class="discard-btn" id="pending-discard-btn" style="width:100%;">Discard this discovery</button>
   `;
   el.appendChild(card);
   el.querySelectorAll('[data-place-pending]').forEach(target=>{
