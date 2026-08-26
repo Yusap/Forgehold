@@ -50,6 +50,7 @@
   }
   .title-row{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;}
   .title-row h1{font-size:1.35rem;color:var(--bronze-bright);}
+  .game-version{font-size:0.62rem;color:var(--parchment-dim);font-weight:400;letter-spacing:0.05em;vertical-align:super;margin-left:2px;}
   .title-row .subtitle{font-size:0.68rem;color:var(--parchment-dim);letter-spacing:0.15em;text-transform:uppercase;}
   .header-actions{display:flex;gap:6px;}
   .icon-btn{
@@ -380,7 +381,7 @@
 
 <header>
   <div class="title-row">
-    <h1>⚒ Forgehold</h1>
+    <h1>⚒ Forgehold <span class="game-version" id="game-version"></span></h1>
     <div class="header-actions">
       <button id="header-save-btn" class="icon-btn" title="Save game">💾 Save</button>
       <button id="header-load-btn" class="icon-btn" title="Load game">📂 Load</button>
@@ -613,7 +614,6 @@ const MAX_AFFIXES = 4;
 // Weak/universal effects sit low; the two build-around mechanics
 // (Conversion, Synergy) plus one global-economy effect are Purple-exclusive.
 const AFFIX_TYPES = [
-  { key:'flatBonus',      needsStat:true,  allowAll:false, min:1,   max:6,  powerTier:0 },
   { key:'bonusItem',      needsStat:false, min:1,   max:8,          powerTier:0 },
   { key:'dropTierUp',     needsStat:false, min:3,   max:18,         powerTier:0 },
   { key:'dropTierDown',   needsStat:false, min:3,   max:18,         powerTier:0 },
@@ -667,7 +667,6 @@ function describeAffix(affix){
   const s = affixStatLabel(affix);
   switch(affix.type){
     case 'prodBoost': return `+${affix.value}% ${s} production`;
-    case 'flatBonus': return `+${affix.value} flat ${s} production`;
     case 'dropTierUp': return `${affix.value}% chance to upgrade a drop's tier`;
     case 'dropTierDown': return `${affix.value}% chance to downgrade a drop's tier`;
     case 'rareChance': return `+${affix.value}% rare/legendary drop chance`;
@@ -737,10 +736,6 @@ const AFFIX_GLOSSARY_TEXT = {
   prodBoost: {
     icon: '📈', label: 'Production Boost',
     desc: d => `Increases a land's output by a flat percentage, rolled ${d.min}%–${d.max}%. Rolls a specific resource, or "All" (30% chance) to boost every resource that land produces.`,
-  },
-  flatBonus: {
-    icon: '➕', label: 'Flat Bonus',
-    desc: d => `Adds a flat amount of production per second (rolled ${d.min}–${d.max}) to a land whose resource matches the affix. Does nothing if attached to a land of a different resource.`,
   },
   dropTierUp: {
     icon: '⬆️', label: 'Drop Tier Up',
@@ -915,6 +910,7 @@ function buildAchievementsHtml(){
   return html;
 }
 
+const GAME_VERSION = 1;
 const SAVE_KEY = 'forgehold-save-v8';
 const TICK_MS = 1000;
 const SAVE_EVERY_TICKS = 8;
@@ -1146,13 +1142,6 @@ function landOwnProdBoost(land){
   });
   return sum/100;
 }
-function landFlatBonus(land){
-  let sum = 0;
-  itemsOnLand(land.id).forEach(item=>{
-    item.affixes.forEach(a=>{ if(a.type === 'flatBonus' && a.stat === land.resource) sum += a.value; });
-  });
-  return sum;
-}
 function landSynergyInflow(land){
   let inflow = 0;
   occupiedLands().forEach(other=>{
@@ -1179,9 +1168,8 @@ function landProductionRate(land){
   // constant at any level.
   const base = cfg.base * Math.pow(COST_GROWTH, land.level);
   const boost = landOwnProdBoost(land) + landSynergyInflow(land);
-  const flat = landFlatBonus(land);
   const doubleMult = 1 + landAffixSum(land,'doubleHarvest')/100;
-  const scaledRate = (base*(1+boost) + flat) * doubleMult * GLOBAL_SPEED;
+  const scaledRate = (base*(1+boost)) * doubleMult * GLOBAL_SPEED;
   // Rush's "Permanent +X/s" prize is a literal, already-final rate
   // addition — it must NOT be scaled down again by GLOBAL_SPEED, or the
   // advertised number on the prize wouldn't match what actually shows up
@@ -2503,6 +2491,7 @@ document.getElementById('rush-overlay').addEventListener('click', (e)=>{
 // ---------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------
+document.getElementById('game-version').textContent = `v${GAME_VERSION}`;
 bootLoad().then(()=>{
   document.getElementById('storage-mode-line').textContent = describeStorageMode();
   setInterval(tick, TICK_MS);
