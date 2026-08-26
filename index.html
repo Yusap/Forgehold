@@ -321,13 +321,19 @@
   .ach-summary{font-size:0.8rem;color:var(--bronze-bright);font-weight:700;margin-bottom:12px;}
   .ach-tier-title{font-family:'Cinzel',serif;font-size:0.78rem;color:var(--bronze-bright);text-transform:uppercase;letter-spacing:0.08em;margin:16px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px;}
   .ach-tier-title:first-of-type{margin-top:0;}
-  .ach-row{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px dashed var(--line);cursor:default;}
+  .ach-row{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px dashed var(--line);cursor:pointer;}
   .ach-row:first-of-type{border-top:none;}
+  .ach-row.expanded{background:var(--surface2);border-radius:6px;padding-left:6px;}
   .ach-icon{font-size:1.1rem;line-height:1;flex-shrink:0;}
   .ach-title{font-family:'Cinzel',serif;font-size:0.78rem;}
   .ach-row.unlocked .ach-title{color:var(--bronze-bright);}
   .ach-row.locked{opacity:0.55;}
   .ach-row.locked .ach-title{color:var(--parchment-dim);}
+  .ach-detail{
+    display:none;font-size:0.7rem;color:var(--parchment);line-height:1.5;
+    padding:2px 6px 10px 32px;margin-top:-4px;
+  }
+  .ach-detail.expanded{display:block;}
   .orb-btn{
     background:var(--surface2);border:1px solid var(--violet);color:var(--violet-bright);
     border-radius:6px;padding:6px 9px;font-size:0.68rem;font-family:'JetBrains Mono',monospace;cursor:pointer;
@@ -490,7 +496,6 @@
   <div style="background:var(--surface);border:1px solid var(--bronze);border-radius:12px;padding:20px;max-width:340px;width:100%;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
       <h2 id="rush-title" style="font-family:'Cinzel',serif;font-size:1rem;color:var(--bronze-bright);margin:0;">🎯 Rush</h2>
-      <button id="rush-cancel-btn" aria-label="Close rush" style="background:none;border:1px solid var(--line);color:var(--parchment-dim);border-radius:7px;padding:6px 12px;font-size:0.85rem;cursor:pointer;">✕</button>
     </div>
     <div id="rush-body"></div>
   </div>
@@ -516,11 +521,11 @@ const LAND_TYPE_LABEL = {
 };
 
 const RESOURCE_CONFIG = {
-  wood:    {icon:'🪓', base:0.1, costRes:['stone','food'], costBase:[8,6]},
-  stone:   {icon:'⛏️', base:0.1, costRes:['wood','food'],  costBase:[8,6]},
-  food:    {icon:'🌾', base:0.1, costRes:['wood','stone'], costBase:[8,8]},
-  gold:    {icon:'💰', base:0.1, costRes:['wood','stone','food'], costBase:[10,5,12]},
-  essence: {icon:'✨', base:0.1, costRes:['wood','stone','food'], costBase:[5,12,10]},
+  wood:    {icon:'🪓', base:0.1, costRes:['stone','food'], costBase:[80,60]},
+  stone:   {icon:'⛏️', base:0.1, costRes:['wood','food'],  costBase:[80,60]},
+  food:    {icon:'🌾', base:0.1, costRes:['wood','stone'], costBase:[80,80]},
+  gold:    {icon:'💰', base:0.1, costRes:['wood','stone','food'], costBase:[100,50,120]},
+  essence: {icon:'✨', base:0.1, costRes:['wood','stone','food'], costBase:[50,120,100]},
 };
 const LAND_NAME_POOL = {
   wood:    ['Northern Woods','Southern Woods','Whispering Pines','Old Growth Forest','Timberfall','Mossy Hollow','Silverleaf Grove'],
@@ -530,7 +535,7 @@ const LAND_NAME_POOL = {
   essence: ['Moonwell','Starwell','Arcane Spring','Whisper Grove','Etherfall','Mystic Hollow','Sable Sanctum'],
 };
 const COST_GROWTH = 1.2; // upgrade cost growth per level
-const GLOBAL_SPEED = 0.02; // 1/50th pace overall (an additional 10x on top of the previous 5x slowdown)
+const GLOBAL_SPEED = 1.0; // 50x the previous 0.02 pace, per request
 
 // Collectible land resources — one item per resource type per rarity tier.
 // These have no use yet; they're tracked in the Inventory tab.
@@ -573,8 +578,8 @@ function lerpWeights(startTable, endTable, t){
 // Land drop-slot COUNT — freshly-explored land only. Starting/basic land
 // always gets 0 slots (see makeLand's forStarting flag). Early explores
 // heavily favor 0-1 slots ("crappy"); late explores favor 3-5 ("good").
-const LAND_SLOT_WEIGHTS_START = [ [0,55],[1,35],[2,9],[3,1],[4,0],[5,0] ];
-const LAND_SLOT_WEIGHTS_END   = [ [0,0], [1,10],[2,20],[3,30],[4,25],[5,15] ];
+const LAND_SLOT_WEIGHTS_START = [ [1,90],[2,9],[3,1],[4,0],[5,0] ];
+const LAND_SLOT_WEIGHTS_END   = [ [1,10],[2,20],[3,30],[4,25],[5,15] ];
 function currentLandSlotWeights(){
   return lerpWeights(LAND_SLOT_WEIGHTS_START, LAND_SLOT_WEIGHTS_END, explorationProgressLand());
 }
@@ -783,12 +788,12 @@ const AFFIX_GLOSSARY_TEXT = {
   },
 };
 const GLOSSARY_CONCEPTS = [
-  { icon:'📦', title:'Drops', desc:'Passive loot your lands generate over time (e.g. Oak Log, Gold Ingot). Your starting lands are "basic" and have no drop slots of their own — only lands found through Exploring can roll drop slots (0–5 of them, each a fixed rarity tier). Drops are spent as crafting currency, tracked in the Inventory tab.' },
+  { icon:'📦', title:'Drops', desc:'Passive loot your lands generate over time (e.g. Oak Log, Gold Ingot). Your starting lands are "basic" and have no drop slots of their own — only lands found through Exploring can roll drop slots (1–5 of them, guaranteed at least one, each a fixed rarity tier). Drops are spent as crafting currency, tracked in the Inventory tab.' },
   { icon:'⚒️', title:'Items', desc:`Crafted from a Recipe by spending drops. An item carries up to ${MAX_AFFIXES} affixes, is bound to one resource, and only attaches to a land of that same resource. Stays attached indefinitely until you swap or discard it.` },
   { icon:'🔨', title:'Crafting Costs', desc:'Each of the 5 Crafting Station actions draws from its own fixed resource (Add=Wood, Reroll All=Stone, Reroll One=Gold, Remove=Food, Change Land Type=Essence), independent of the item\'s own bound resource. Each action escalates through its own 4 uses: 1st=Common, 2nd=Uncommon, 3rd=Rare, 4th+=Legendary. Change Land Type rebinds the item to a new resource, renaming it and remapping any resource-specific affixes to match.' },
   { icon:'🧭', title:'Exploration Progress', desc:'Explore for Land (Essence) and Explore for Recipe (Gold) are separate actions with independent costs and quality curves. The more you\'ve used each, the pricier it gets — and the better its finds get too, approaching (but never fully reaching) a ceiling. Common drops always stay more likely than rare ones, however far you\'ve progressed.' },
   { icon:'🎲', title:'Affix Tiers', desc:'Every affix has a power tier — Grey (weak, appears on any item), Blue, Yellow, or Purple (strongest, Purple-items only). An item can only roll affixes at or below its own rarity. Affix text is colored to match its tier.' },
-  { icon:'🎯', title:'Rush', desc:'A free, no-cost gamble available on any land. Each round offers two choices (currency or a drop item, each with a risk cost) plus the option to quit. Risk accumulates and represents your % chance to walk away with nothing — quitting rolls against your total risk (capped at 100): roll under your risk and you lose everything found this run; roll at or above it and you keep it all.' },
+  { icon:'🎯', title:'Rush', desc:'A free, no-cost gamble available on any land. Each round offers two choices (currency or a drop item, each with a risk cost) plus the option to quit — only options that resource the land could actually produce ever appear. Every session starts at a 40% base risk before you\'ve even picked anything. Taking risk shrinks a continuous "safe zone" along a bar; quitting sends a marker bouncing back and forth until you click Stop to freeze it. Land inside the safe zone and you keep everything found — land outside and you walk away with nothing. Losing locks that land\'s Rush until a different land attempts one.' },
 ];
 function buildGlossaryHtml(){
   const conceptRows = GLOSSARY_CONCEPTS.map((c,i)=>`
@@ -823,19 +828,6 @@ const STARTING_LAND_TYPES = ['wood','wood','stone','gold','food','essence'];
 // later becomes false again.
 // ---------------------------------------------------------------
 const ACHIEVEMENTS = [
-  // Easy
-  {id:'first_steps', tier:'easy', title:'First Steps', desc:'Use Explore for the first time.',
-    check: s => s.exploreLandCount >= 1 || s.exploreRecipeCount >= 1},
-  {id:'finders_keepers', tier:'easy', title:'Finders Keepers', desc:'Collect your first drop item of any kind.',
-    check: s => s.lifetimeStats.totalDropsEver >= 1},
-  {id:'blueprint_found', tier:'easy', title:'Blueprint Found', desc:'Discover your first Recipe.',
-    check: s => s.recipes.length >= 1},
-  {id:'forged', tier:'easy', title:'Forged', desc:'Craft your first item.',
-    check: s => s.lifetimeStats.craftCount >= 1},
-  {id:'bound_together', tier:'easy', title:'Bound Together', desc:'Attach an item to a land for the first time.',
-    check: s => s.lifetimeStats.itemAttachedEver},
-  {id:'tinkerer', tier:'easy', title:'Tinkerer', desc:'Successfully modify a crafted item at the Crafting Station for the first time (Add, Reroll, Remove, or Change Land Type).',
-    check: s => Object.values(s.lifetimeStats.modActionsUsed).some(Boolean)},
   // Medium
   {id:'jack_of_all_trades', tier:'medium', title:'Jack of All Trades', desc:'Use Add Affix, Reroll All, Reroll One, and Remove Affix at least once each.',
     check: s => ['add','rerollAll','rerollOne','remove'].every(k=>s.lifetimeStats.modActionsUsed[k])},
@@ -866,12 +858,30 @@ const ACHIEVEMENTS = [
     check: s => occupiedLands().some(l=>landSynergyInflow(l) > 0)},
   {id:'settlement_of_legend', tier:'hard', title:'Settlement of Legend', desc:'Have every owned land at level 10 or higher, simultaneously.',
     check: s => { const o = occupiedLands(); return o.length>0 && o.every(l=>l.level>=10); }},
+  // Very Hard — deep, deliberate, end-game goals
+  {id:'grand_unification', tier:'hard', title:'Grand Unification', desc:'Have all 6 of your lands simultaneously at level 20 or higher.',
+    check: s => { const o = occupiedLands(); return o.length>=6 && o.every(l=>l.level>=20); }},
+  {id:'perfect_specimen', tier:'hard', title:'Perfect Specimen', desc:'Own a Purple-rarity item with all 4 affix slots filled, every affix Purple-tier.',
+    check: s => s.items.some(i=> i.rarity==='purple' && i.affixes.length>=MAX_AFFIXES && i.affixes.every(a=>affixTierColor(a)==='purple'))},
+  {id:'nerves_of_steel', tier:'hard', title:'Nerves of Steel', desc:'Win a Rush with your total risk at 90% or higher — a razor-thin safe zone.',
+    check: s => s.lifetimeStats.nervesOfSteelEver},
+  {id:'hoarders_vault', tier:'hard', title:"Hoarder's Vault", desc:'Accumulate 500 of a single Legendary-tier drop item at once.',
+    check: s => Object.entries(s.inventory||{}).some(([k,v])=> k.endsWith('-legendary') && v>=500)},
+  {id:'century_club', tier:'hard', title:'Century Club', desc:'Reach 100 combined Explores (Land + Recipe).',
+    check: s => (s.exploreLandCount + s.exploreRecipeCount) >= 100},
+  {id:'unstoppable', tier:'hard', title:'Unstoppable', desc:'Reach level 50 on any single land.',
+    check: s => occupiedLands().some(l=>l.level>=50)},
 ];
 function checkAchievements(){
   const newly = [];
   ACHIEVEMENTS.forEach(a=>{
     if(state.achievementsUnlocked[a.id]) return;
-    if(a.check(state)){
+    // A single achievement whose check() throws (e.g. against an older or
+    // partially-patched save missing some lifetimeStats field) must never
+    // abort evaluation of every achievement after it in the list.
+    let met = false;
+    try{ met = a.check(state); }catch(e){ met = false; }
+    if(met){
       state.achievementsUnlocked[a.id] = true;
       newly.push(a);
     }
@@ -888,13 +898,18 @@ function buildAchievementsHtml(){
   const unlockedCount = ACHIEVEMENTS.filter(a=>state.achievementsUnlocked[a.id]).length;
   let html = `<div class="ach-summary">${unlockedCount} / ${ACHIEVEMENTS.length} unlocked</div>`;
   ['easy','medium','hard'].forEach(tier=>{
+    const items = ACHIEVEMENTS.filter(a=>a.tier===tier);
+    if(items.length === 0) return; // e.g. Easy is now empty — skip the heading entirely
     html += `<h3 class="ach-tier-title">${tierLabel[tier]}</h3>`;
-    ACHIEVEMENTS.filter(a=>a.tier===tier).forEach(a=>{
+    items.forEach(a=>{
       const unlocked = !!state.achievementsUnlocked[a.id];
-      html += `<div class="ach-row ${unlocked?'unlocked':'locked'}" title="${a.desc}">
-        <div class="ach-icon">${unlocked?'🏆':'🔒'}</div>
-        <div class="ach-title">${a.title}</div>
-      </div>`;
+      html += `
+        <div class="ach-row ${unlocked?'unlocked':'locked'}" data-ach-toggle="${a.id}" title="${a.desc.replace(/"/g,'&quot;')}">
+          <div class="ach-icon">${unlocked?'🏆':'🔒'}</div>
+          <div class="ach-title">${a.title}</div>
+        </div>
+        <div class="ach-detail" id="ach-detail-${a.id}">${a.desc}</div>
+      `;
     });
   });
   return html;
@@ -1020,7 +1035,7 @@ function createInitialState(){
   const usedLandNames = new Set();
   let nextLandId = 1;
   const landSlots = STARTING_LAND_TYPES.map(resource => makeLand(resource, nextLandId++, usedLandNames, true));
-  const startingResources = {wood:50, stone:50, food:50, gold:50, essence:50};
+  const startingResources = {wood:200, stone:200, food:200, gold:200, essence:200};
   const startingInventory = {};
   return {
     resources: startingResources,
@@ -1047,6 +1062,7 @@ function createInitialState(){
       maxModCountEver: 0,
       purpleItemEver: false,
       itemAttachedEver: false,
+      nervesOfSteelEver: false,
     },
   };
 }
@@ -1060,6 +1076,24 @@ function fmt(n){
   if(n < 1000) return n.toFixed(n<10?1:0);
   if(n < 1e6) return (n/1e3).toFixed(2)+'k';
   if(n < 1e9) return (n/1e6).toFixed(2)+'M';
+  return (n/1e9).toFixed(2)+'B';
+}
+// Rates ("+X/s") need enough precision that the number shown is actually
+// true, not a rounded-away approximation — fmt()'s 1-decimal cutoff was
+// fine for absolute totals, but at GLOBAL_SPEED's small per-second values
+// it could show "0.0/s" for a land that's still genuinely producing, or
+// show "1.0/s" for something actually earning 0.97/s (a real, perceptible
+// gap after enough seconds). This scales precision up as the number
+// shrinks so what's displayed matches what's actually being applied.
+function fmtRate(n){
+  const abs = Math.abs(n);
+  if(abs === 0) return '0';
+  if(abs < 0.01) return n.toFixed(4);
+  if(abs < 1) return n.toFixed(3);
+  if(abs < 10) return n.toFixed(2);
+  if(abs < 1000) return n.toFixed(1);
+  if(abs < 1e6) return (n/1e3).toFixed(2)+'k';
+  if(abs < 1e9) return (n/1e6).toFixed(2)+'M';
   return (n/1e9).toFixed(2)+'B';
 }
 function occupiedLands(){ return state.landSlots.filter(Boolean); }
@@ -1145,9 +1179,15 @@ function landProductionRate(land){
   // constant at any level.
   const base = cfg.base * Math.pow(COST_GROWTH, land.level);
   const boost = landOwnProdBoost(land) + landSynergyInflow(land);
-  const flat = landFlatBonus(land) + (land.rushFlatBonus||0);
+  const flat = landFlatBonus(land);
   const doubleMult = 1 + landAffixSum(land,'doubleHarvest')/100;
-  return (base*(1+boost) + flat) * doubleMult * GLOBAL_SPEED;
+  const scaledRate = (base*(1+boost) + flat) * doubleMult * GLOBAL_SPEED;
+  // Rush's "Permanent +X/s" prize is a literal, already-final rate
+  // addition — it must NOT be scaled down again by GLOBAL_SPEED, or the
+  // advertised number on the prize wouldn't match what actually shows up
+  // (this was the bug: it used to get buried, e.g. a "+0.1/s" prize only
+  // ever added 0.002/s to the displayed rate).
+  return scaledRate + (land.rushFlatBonus||0);
 }
 function landOutputs(land){
   const rate = landProductionRate(land);
@@ -1170,11 +1210,11 @@ function productionRate(res){
 }
 function exploreLandCost(){
   const discount = Math.min(0.85, globalAffixSum('landExploreCostDown')/100);
-  return Math.ceil(15 * Math.pow(1.15, state.exploreLandCount) * (1-discount));
+  return Math.ceil(150 * Math.pow(1.15, state.exploreLandCount) * (1-discount));
 }
 function exploreRecipeCost(){
   const discount = Math.min(0.85, globalAffixSum('recipeExploreCostDown')/100);
-  return Math.ceil(15 * Math.pow(1.15, state.exploreRecipeCount) * (1-discount));
+  return Math.ceil(150 * Math.pow(1.15, state.exploreRecipeCount) * (1-discount));
 }
 function toast(msg){
   const t = document.getElementById('toast');
@@ -1465,16 +1505,20 @@ const RUSH_TICK_MS = 30;
 // dropSlots actually contain — a land can never offer a drop tier it
 // couldn't itself produce.
 const RUSH_DROP_CATEGORY_WEIGHTS = {common:28, uncommon:15, rare:6, legendary:1.5};
-function rushCategoryWeightsForLand(land){
+function rushCategoryWeightsForLand(land, currentLoot){
+  currentLoot = currentLoot || [];
   const availableTiers = new Set(land.dropSlots);
   const list = [['currency', 40]];
   TIERS.forEach(tier=>{
     if(availableTiers.has(tier)) list.push([`drop-${tier}`, RUSH_DROP_CATEGORY_WEIGHTS[tier]]);
   });
-  list.push(['freeUpgrade', 3], ['prodBoost', 4], ['recipe', 2.5]);
+  list.push(['freeUpgrade', 3], ['prodBoost', 4]);
+  // These only make sense — and only appear — once there's something in
+  // the pot worth doubling.
+  if(currentLoot.some(o=>o.kind==='currency')) list.push(['doubleCurrency', 2]);
+  if(currentLoot.some(o=>o.kind==='drop')) list.push(['doubleDrop', 1]);
   return list;
 }
-const RUSH_PROD_BOOST_PER_LEVEL = 0.1;
 let rushState = null;
 // Picks a quantity from 1..maxAmount where larger amounts are progressively
 // rarer (each +1 unit halves its odds) — the level determines how big an
@@ -1484,9 +1528,17 @@ function pickRushAmount(maxAmount){
   for(let a=1; a<=maxAmount; a++) pairs.push([a, Math.pow(0.5, a-1)]);
   return weightedPick(pairs);
 }
-function rollRushOption(land){
+function landBaseRateRaw(land){
+  // The land's plain output with zero items, affixes, or Rush bonuses —
+  // used as the yardstick for Rush's "Permanent" prize so it stays
+  // proportional to what the land actually produces, rather than an
+  // arbitrary level-only formula.
+  const cfg = RESOURCE_CONFIG[land.resource];
+  return cfg.base * Math.pow(COST_GROWTH, land.level) * GLOBAL_SPEED;
+}
+function rollRushOption(land, currentLoot){
   const lvl = land.level;
-  const category = weightedPick(rushCategoryWeightsForLand(land));
+  const category = weightedPick(rushCategoryWeightsForLand(land, currentLoot));
   if(category === 'currency'){
     const amount = pickRushAmount(1 + Math.floor(lvl/2));
     const risk = Math.max(2, Math.round(amount*1.5 + Math.random()*4));
@@ -1504,9 +1556,28 @@ function rollRushOption(land){
     return {kind:'freeUpgrade', risk, icon:'⬆️', name:'Free Upgrade'};
   }
   if(category === 'prodBoost'){
-    const value = +(RUSH_PROD_BOOST_PER_LEVEL * lvl).toFixed(2);
+    // Proportional to this land's own plain output: roughly 33%-100% of
+    // its base rate (e.g. a land basically outputting 0.3/s offers a
+    // permanent boost somewhere between 0.1 and 0.3/s), not a fixed
+    // level-only number disconnected from what the land actually makes.
+    const baseRate = landBaseRateRaw(land);
+    const factor = 0.33 + Math.random()*0.67;
+    const value = +(baseRate * factor).toFixed(3);
     const risk = Math.min(75, 20 + lvl*2);
     return {kind:'prodBoost', value, risk, icon:'📈', name:`Permanent +${value}/s`};
+  }
+  if(category === 'doubleCurrency'){
+    // Doubles every Currency-kind prize already sitting in the loot list
+    // (applied immediately on pick, not on final win) — its risk scales
+    // with land level, same as the other special prizes.
+    const risk = Math.min(90, 30 + lvl*3);
+    return {kind:'doubleCurrency', risk, icon:'✨', name:'Double Currency'};
+  }
+  if(category === 'doubleDrop'){
+    // Doubles every Drop-kind prize already sitting in the loot list —
+    // the drop-focused counterpart to doubleCurrency.
+    const risk = Math.min(85, 35 + lvl*3);
+    return {kind:'doubleDrop', risk, icon:'💎', name:'Double Drop'};
   }
   // 'recipe' — a recipe typed to this land's own resource, quality scaling
   // with land level, never something the land couldn't itself produce.
@@ -1516,12 +1587,13 @@ function rollRushOption(land){
 function isRushLocked(landId){
   return state.rushLockedLandId === landId;
 }
+const RUSH_BASE_RISK = 40; // every Rush session starts here, not 0 — prevents a near-guaranteed win off just one or two cheap picks
 function startRush(slotIndex){
   const land = state.landSlots[slotIndex];
   if(!land || isRushLocked(land.id)) return;
   const zoneCenter = Math.random()*100; // computed first, deliberately — see note below
   rushState = {
-    slotIndex, loot:[], totalRisk:0, phase:'choosing',
+    slotIndex, loot:[], totalRisk:RUSH_BASE_RISK, phase:'choosing',
     options:[rollRushOption(land), rollRushOption(land)],
     zoneCenter, // fixed for this whole session — randomizes where the safe zone sits
   };
@@ -1532,12 +1604,16 @@ function rushOptionLabel(opt){
   if(opt.kind === 'freeUpgrade') return `⬆️ Free Upgrade — ${opt.risk}% risk`;
   if(opt.kind === 'prodBoost') return `📈 Permanent +${opt.value}/s — ${opt.risk}% risk`;
   if(opt.kind === 'recipe') return `${opt.icon} ${opt.name} — ${opt.risk}% risk`;
+  if(opt.kind === 'doubleCurrency') return `✨ Double Currency (×2 all Currency so far) — ${opt.risk}% risk`;
+  if(opt.kind === 'doubleDrop') return `💎 Double Drop (×2 all Drops so far) — ${opt.risk}% risk`;
   return `+${opt.amount} ${opt.icon} ${opt.name} — ${opt.risk}% risk`;
 }
 function rushLootLineLabel(opt){
   if(opt.kind === 'freeUpgrade') return `⬆️ Free Upgrade`;
   if(opt.kind === 'prodBoost') return `📈 Permanent +${opt.value}/s`;
   if(opt.kind === 'recipe') return `${opt.icon} ${opt.name}`;
+  if(opt.kind === 'doubleCurrency') return `✨ Doubled all Currency prizes!`;
+  if(opt.kind === 'doubleDrop') return `💎 Doubled all Drop prizes!`;
   return `+${opt.amount} ${opt.icon} ${opt.name}`;
 }
 function rushZoneBounds(){
@@ -1552,10 +1628,35 @@ function rushTrianglePos(elapsedMs){
 function rushPick(which){
   if(!rushState || rushState.phase !== 'choosing') return;
   const opt = rushState.options[which === 'A' ? 0 : 1];
+  if(opt.kind === 'doubleCurrency'){
+    rushState.loot.forEach(o=>{ if(o.kind==='currency') o.amount *= 2; });
+  } else if(opt.kind === 'doubleDrop'){
+    rushState.loot.forEach(o=>{ if(o.kind==='drop') o.amount *= 2; });
+  }
   rushState.loot.push(opt);
   rushState.totalRisk = Math.min(RUSH_MAX_RISK, rushState.totalRisk + opt.risk);
+  if(rushState.totalRisk >= RUSH_MAX_RISK){
+    // 0% chance to win — nothing left to click for, resolve immediately
+    // rather than making the player go through Quit + Stop for a
+    // foregone conclusion.
+    autoFailRush();
+    return;
+  }
   const land = state.landSlots[rushState.slotIndex];
-  rushState.options = [rollRushOption(land), rollRushOption(land)];
+  rushState.options = [rollRushOption(land, rushState.loot), rollRushOption(land, rushState.loot)];
+  renderRush();
+}
+function autoFailRush(){
+  const land = state.landSlots[rushState.slotIndex];
+  rushState.phase = 'lost';
+  rushState.autoFailed = true;
+  rushState.finalPos = null;
+  rushState.zoneAtStop = {start:0, end:0, width:0};
+  if(state.rushLockedLandId !== land.id) state.rushLockedLandId = null;
+  state.rushLockedLandId = land.id;
+  toast(`Rush auto-fails — risk hit 100%, no chance to win. ${land.name} needs a break before you can Rush it again.`);
+  silentAutosave();
+  render();
   renderRush();
 }
 function rushQuit(){
@@ -1587,6 +1688,9 @@ function rushStop(){
   // just failed. A win never locks anything.
   if(state.rushLockedLandId !== land.id) state.rushLockedLandId = null;
   if(!won) state.rushLockedLandId = land.id;
+  if(won && rushState.totalRisk >= 90){
+    state.lifetimeStats.nervesOfSteelEver = true;
+  }
   if(won){
     rushState.loot.forEach(opt=>{
       if(opt.kind === 'currency'){
@@ -1604,6 +1708,8 @@ function rushStop(){
         const recipe = makeRecipe(state.nextRecipeId++, lvlProgress, opt.resource);
         state.recipes.push(recipe);
       }
+      // 'doubleCurrency'/'doubleDrop' need no handling here — their effect
+      // was already applied immediately at pick time in rushPick().
     });
     toast(`Rush pays off! You keep everything you found.`);
   } else {
@@ -1627,7 +1733,7 @@ function renderRush(){
     : `<div class="rush-loot-empty">Nothing risked yet.</div>`;
   const zone = rushState.phase === 'won' || rushState.phase === 'lost' ? rushState.zoneAtStop : rushZoneBounds();
   const indicatorPos = (rushState.phase === 'won' || rushState.phase === 'lost') ? rushState.finalPos : rushState.indicatorPos;
-  const showIndicator = rushState.phase === 'rolling' || rushState.phase === 'won' || rushState.phase === 'lost';
+  const showIndicator = (rushState.phase === 'rolling' || rushState.phase === 'won' || rushState.phase === 'lost') && indicatorPos !== null && indicatorPos !== undefined;
   const zoneTrackHtml = `
     <div class="rush-zone-track">
       <div class="rush-zone-safe" style="left:${zone.start}%;width:${zone.width}%;"></div>
@@ -1653,7 +1759,10 @@ function renderRush(){
     bottomHtml = `<div class="rush-result rush-win">Landed inside the safe zone — you win it all!</div>
       <button class="rush-quit-btn" id="rush-close-btn">Close</button>`;
   } else {
-    bottomHtml = `<div class="rush-result rush-lose">Landed outside the safe zone — nothing this time.</div>
+    const loseMsg = rushState.autoFailed
+      ? 'Risk hit 100% — automatic failure, no chance to win.'
+      : 'Landed outside the safe zone — nothing this time.';
+    bottomHtml = `<div class="rush-result rush-lose">${loseMsg}</div>
       <button class="rush-quit-btn" id="rush-close-btn">Close</button>`;
   }
   body.innerHTML = `
@@ -1910,7 +2019,7 @@ function discardItem(itemId){
 function renderResourceBar(){
   Object.keys(RESOURCE_META).forEach(res=>{
     document.getElementById('r-'+res).textContent = fmt(state.resources[res]);
-    document.getElementById('rt-'+res).textContent = '+'+fmt(productionRate(res))+'/s';
+    document.getElementById('rt-'+res).textContent = '+'+fmtRate(productionRate(res))+'/s';
   });
 }
 
@@ -2039,7 +2148,7 @@ function renderSpots(){
         <div class="item-slots">${buildItemSlotsHtml(land)}</div>
         <button class="rush-btn" data-rush-slot="${idx}" ${isRushLocked(land.id)?'disabled':''} title="${isRushLocked(land.id) ? 'This land needs a break — try Rush on a different land first.' : 'Free gamble — risk items/currency for a bigger haul'}">🎯 Rush</button>
       </div>
-      <div class="spot-rate" data-rate-slot="${idx}">${meta.icon} ${fmt(rate)}/s</div>
+      <div class="spot-rate" data-rate-slot="${idx}">${meta.icon} ${fmtRate(rate)}/s</div>
       <button class="upbtn" ${affordable?'':'disabled'} data-upgrade-slot="${idx}">
         Upgrade
         <span class="cost">${costStr}</span>
@@ -2066,7 +2175,7 @@ function updateSpotsLive(){
     const rateEl = document.querySelector(`[data-rate-slot="${idx}"]`);
     if(rateEl){
       const meta = RESOURCE_META[land.resource];
-      rateEl.textContent = `${meta.icon} ${fmt(landProductionRate(land))}/s`;
+      rateEl.textContent = `${meta.icon} ${fmtRate(landProductionRate(land))}/s`;
     }
     const upgradeBtn = document.querySelector(`[data-upgrade-slot="${idx}"]`);
     if(upgradeBtn){
@@ -2370,12 +2479,23 @@ document.getElementById('achievements-close-btn').addEventListener('click', ()=>
 });
 document.getElementById('achievements-overlay').addEventListener('click', (e)=>{
   if(e.target.id === 'achievements-overlay') document.getElementById('achievements-overlay').style.display = 'none';
+  const toggleRow = e.target.closest('[data-ach-toggle]');
+  if(toggleRow){
+    const key = toggleRow.getAttribute('data-ach-toggle');
+    const detail = document.getElementById('ach-detail-'+key);
+    const isOpen = detail.classList.contains('expanded');
+    document.querySelectorAll('.ach-detail.expanded').forEach(d=>d.classList.remove('expanded'));
+    document.querySelectorAll('.ach-row.expanded').forEach(r=>r.classList.remove('expanded'));
+    if(!isOpen){
+      detail.classList.add('expanded');
+      toggleRow.classList.add('expanded');
+    }
+  }
 });
 
 // ---------------------------------------------------------------
 // Rush
 // ---------------------------------------------------------------
-document.getElementById('rush-cancel-btn').addEventListener('click', closeRush);
 document.getElementById('rush-overlay').addEventListener('click', (e)=>{
   if(e.target.id === 'rush-overlay') closeRush();
 });
